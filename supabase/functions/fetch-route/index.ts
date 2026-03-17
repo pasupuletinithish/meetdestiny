@@ -1,0 +1,53 @@
+[{
+	"resource": "/c:/Users/pmani/Downloads/Design travel networking app/supabase/functions/send-push-notification/index.ts",
+	"owner": "typescript",
+	"code": "2307",
+	"severity": 8,
+	"message": "Cannot find module 'https://deno.land/std@0.168.0/http/server.ts' or its corresponding type declarations.",
+	"source": "ts",
+	"startLineNumber": 1,
+	"startColumn": 23,
+	"endLineNumber": 1,
+	"endColumn": 69,
+	"modelVersionId": 5,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/Users/pmani/Downloads/Design travel networking app/supabase/functions/send-push-notification/index.ts",
+	"owner": "typescript",
+	"code": "2304",
+	"severity": 8,
+	"message": "Cannot find name 'Deno'.",
+	"source": "ts",
+	"startLineNumber": 34,
+	"startColumn": 22,
+	"endLineNumber": 34,
+	"endColumn": 26,
+	"modelVersionId": 5,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/Users/pmani/Downloads/Design travel networking app/supabase/functions/send-push-notification/index.ts",
+	"owner": "typescript",
+	"code": "7006",
+	"severity": 8,
+	"message": "Parameter 'req' implicitly has an 'any' type.",
+	"source": "ts",
+	"startLineNumber": 82,
+	"startColumn": 14,
+	"endLineNumber": 82,
+	"endColumn": 17,
+	"modelVersionId": 5,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/Users/pmani/Downloads/Design travel networking app/supabase/functions/send-push-notification/index.ts",
+	"owner": "typescript",
+	"code": "18046",
+	"severity": 8,
+	"message": "'err' is of type 'unknown'.",
+	"source": "ts",
+	"startLineNumber": 135,
+	"startColumn": 31,
+	"endLineNumber": 135,
+	"endColumn": 34,
+	"modelVersionId": 5,
+	"origin": "extHost1"
+}]

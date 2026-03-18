@@ -32,13 +32,11 @@ const moderateMessage = async (
   text: string,
   userName: string,
   warnCount: number
-)
-: Promise<{
+): Promise<{
   allowed: boolean;
   shouldWarn: boolean;
   shouldBlock: boolean;
   aiReply: string;
-  
 }> => {
   console.log('🤖 Moderating:', text);
   try {
@@ -82,7 +80,6 @@ Rules:
   "Congrats on finding the block button so fast! 🏆"
   "This isn't that kind of journey, friend. Try again. 👋"
   "Our AI is embarrassed for you. Really. 😬"
-  "Complimenting strangers like that? Bold move. Not allowed here. 🚫"
   "Sir this is a travel app, not a dating app. 😂"
 - Normal travel chat, greetings, questions are ALWAYS allowed`,
           },
@@ -113,11 +110,12 @@ Rules:
       shouldBlock: isViolation && (isSevere || (isMild && warnCount >= 1)),
       aiReply: parsed.ai_reply || '',
     };
-  } catch {
+  } catch (err) {
+    console.error('Groq error:', err);
     return { allowed: true, shouldWarn: false, shouldBlock: false, aiReply: '' };
   }
 };
-console.log('Groq key:', import.meta.env.VITE_GROQ_API_KEY ? 'loaded ✅' : 'missing ❌');
+
 export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode }) => {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -181,11 +179,10 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
 
       const chatId = isGroup ? checkin.vehicle_id : checkin.to_location;
 
-      // Fetch messages — exclude flagged ones
       const { data: msgs } = await supabase
         .from(tableName).select('*')
         .eq(filterField, chatId)
-        .eq('is_flagged', false)
+        .or('is_flagged.eq.false,is_flagged.is.null')
         .order('created_at', { ascending: true });
       setMessages(msgs || []);
 
@@ -209,7 +206,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
 
   // ── Realtime with AI moderation on incoming messages ──────
   useEffect(() => {
-    if (!currentCheckin || !currentUserId) return;
+    if (!currentCheckin) return; // ← removed !currentUserId check
     const chatId = isGroup ? currentCheckin.vehicle_id : currentCheckin.to_location;
 
     const channel = supabase.channel(`${mode}-chat-${chatId}`)
@@ -219,8 +216,12 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       }, async (payload) => {
         const newMsg = payload.new as Message;
 
-        // ── Own messages — just replace optimistic ──
-        if (newMsg.user_id === currentUserId) {
+        // ✅ Get user ID directly — don't rely on state
+        const { data: { user } } = await supabase.auth.getUser();
+        const userId = user?.id;
+
+        // ── Own messages — replace optimistic ──
+        if (newMsg.user_id === userId) {
           setMessages(prev => {
             if (pendingIds.current.has(newMsg.id)) {
               pendingIds.current.delete(newMsg.id);
@@ -233,8 +234,9 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
           return;
         }
 
-        // ── Incoming messages from OTHERS — run AI moderation ──
+        // ── Incoming from OTHERS — run AI moderation ──
         if (isGroup) {
+          console.log('🤖 Moderating incoming:', newMsg.text);
           const moderation = await moderateMessage(newMsg.text, newMsg.name, 0);
 
           if (!moderation.allowed) {
@@ -259,22 +261,21 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
               return [...prev, aiMsg];
             });
 
-            // Warn or ban sender in DB
+            // Warn or ban sender
             if (moderation.shouldBlock) {
               await supabase.from('user_profiles')
                 .update({ is_banned: true, warn_count: 2 })
                 .eq('user_id', newMsg.user_id);
             } else if (moderation.shouldWarn) {
               try {
-  await supabase.rpc('increment_warn_count', {
-    target_user_id: newMsg.user_id,
-  });
-} catch {
-  await supabase.from('user_profiles')
-    .update({ warn_count: 1, last_warned_at: new Date().toISOString() })
-    .eq('user_id', newMsg.user_id);
-}
-              
+                await supabase.rpc('increment_warn_count', {
+                  target_user_id: newMsg.user_id,
+                });
+              } catch {
+                await supabase.from('user_profiles')
+                  .update({ warn_count: 1, last_warned_at: new Date().toISOString() })
+                  .eq('user_id', newMsg.user_id);
+              }
             }
 
             scrollToBottom();
@@ -291,7 +292,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       }).subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [currentCheckin, currentUserId, mode, isGroup, tableName, filterField, scrollToBottom]);
+  }, [currentCheckin, mode, isGroup, tableName, filterField, scrollToBottom]); // ← removed currentUserId
 
   // ── Send with AI moderation (own messages) ────────────────
   const handleSend = async (e: React.FormEvent) => {
@@ -313,7 +314,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       if (!moderation.allowed) {
         setSending(false);
 
-        // Show AI reply
         if (moderation.aiReply) {
           const aiMsg: Message = {
             id: `ai-${Date.now()}`,
@@ -348,7 +348,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       }
     }
 
-    // ── Send message ──
+    // ── Message passed — send it ──
     const tempId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
       id: tempId,
@@ -364,13 +364,13 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     scrollToBottom();
 
     const payload: Record<string, any> = {
-  user_id: currentUserId,
-  name: currentCheckin.name,
-  profession: currentCheckin.profession,
-  text,
-  avatar_url: currentAvatar,
-  is_flagged: false, // ← correct boolean
-};
+      user_id: currentUserId,
+      name: currentCheckin.name,
+      profession: currentCheckin.profession,
+      text,
+      avatar_url: currentAvatar,
+      is_flagged: false,
+    };
     if (isGroup) payload.vehicle_id = currentCheckin.vehicle_id;
     else payload.destination = currentCheckin.to_location;
 
@@ -545,7 +545,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                     const showHeader = !prevMsg || prevMsg.user_id !== message.user_id;
                     const isLastInGroup = !nextMsg || nextMsg.user_id !== message.user_id;
 
-                    // ── AI system message — centered ──
+                    // ── AI system message ──
                     if (isAIMsg) {
                       return (
                         <motion.div key={message.id}

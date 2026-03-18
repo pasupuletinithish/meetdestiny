@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Send, Users, MapPin, Loader2, BellOff, Bell, Check, CheckCheck } from 'lucide-react';
+import { ArrowLeft, Send, Users, MapPin, Loader2, BellOff, Bell, Check, CheckCheck, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 
@@ -14,6 +14,7 @@ interface Message {
   avatar_url?: string;
   created_at: string;
   pending?: boolean;
+  is_ai?: boolean; // AI moderation message flag
 }
 
 interface CheckinData {
@@ -24,6 +25,93 @@ interface CheckinData {
   to_location: string;
   avatar_url?: string;
 }
+
+// ── Groq AI Moderation ────────────────────────────────────────
+const moderateMessage = async (
+  text: string,
+  userName: string,
+  warnCount: number
+): Promise<{
+  allowed: boolean;
+  shouldWarn: boolean;
+  shouldBlock: boolean;
+  aiReply: string;
+}> => {
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192',
+        messages: [
+          {
+            role: 'system',
+            content: `You are MeetDestiny's AI safety moderator for an Indian travel social app. 
+Your job is to moderate group chat messages between travelers on buses and trains in India.
+
+Analyze messages for:
+- Abusive language, slurs, hate speech
+- Sexual harassment or inappropriate content
+- Spam or fake/irrelevant content
+- Scam attempts or suspicious links
+- Threats or violent content
+
+Regional context: Messages may be in Hindi, Telugu, Tamil, Kannada, Malayalam or English. Understand regional slang.
+
+Respond ONLY with this exact JSON:
+{
+  "allowed": true/false,
+  "violation_type": "none" | "mild" | "severe",
+  "ai_reply": "your sarcastic/funny reply in English if violation, empty string if allowed"
+}
+
+Rules:
+- "allowed": false only for genuine violations
+- "mild" = first warning worthy (mild abuse, borderline content)  
+- "severe" = instant action worthy (sexual content, threats, slurs)
+- ai_reply must be witty, sarcastic and short (max 15 words) if violation
+- ai_reply examples: 
+  "Oh wow, groundbreaking vocabulary! Maybe try actual words? 🙄"
+  "Congrats on finding the block button so fast! 🏆"
+  "This isn't that kind of journey, friend. Try again. 👋"
+  "Our AI is embarrassed for you. Really. 😬"
+- Normal travel chat, greetings, questions are ALWAYS allowed`,
+          },
+          {
+            role: 'user',
+            content: `Message from "${userName}" (previous warnings: ${warnCount}): "${text}"`,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 150,
+      }),
+    });
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) return { allowed: true, shouldWarn: false, shouldBlock: false, aiReply: '' };
+
+    const cleaned = content.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    const isViolation = !parsed.allowed;
+    const isSevere = parsed.violation_type === 'severe';
+    const isMild = parsed.violation_type === 'mild';
+
+    return {
+      allowed: parsed.allowed,
+      shouldWarn: isViolation && isMild && warnCount === 0,
+      shouldBlock: isViolation && (isSevere || (isMild && warnCount >= 1)),
+      aiReply: parsed.ai_reply || '',
+    };
+  } catch {
+    // If AI fails, allow the message (don't block legitimate messages)
+    return { allowed: true, shouldWarn: false, shouldBlock: false, aiReply: '' };
+  }
+};
 
 export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode }) => {
   const navigate = useNavigate();
@@ -36,6 +124,9 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
   const [currentAvatar, setCurrentAvatar] = useState('');
   const [memberCount, setMemberCount] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [warnCount, setWarnCount] = useState(0);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [showWarnBanner, setShowWarnBanner] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pendingIds = useRef<Set<string>>(new Set());
@@ -58,14 +149,23 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       if (!user) { navigate('/'); return; }
       setCurrentUserId(user.id);
 
-      // Fetch current user's avatar
+      // Fetch avatar + warn count
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('avatar_url')
+        .select('avatar_url, warn_count, is_banned')
         .eq('user_id', user.id)
         .maybeSingle();
+
       const avatar = profile?.avatar_url || user.user_metadata?.avatar_url || '';
       setCurrentAvatar(avatar);
+      setWarnCount(profile?.warn_count || 0);
+
+      // If banned → kick out
+      if (profile?.is_banned) {
+        toast.error('Your account has been suspended.');
+        navigate('/');
+        return;
+      }
 
       const { data: checkin } = await supabase
         .from('checkins').select('*')
@@ -126,14 +226,70 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     return () => { supabase.removeChannel(channel); };
   }, [currentCheckin, mode, isGroup, tableName, filterField, scrollToBottom]);
 
+  // ── Send with AI moderation ───────────────────────────────
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageText.trim() || !currentCheckin || !currentUserId || sending) return;
+    if (isBlocked) {
+      toast.error('You have been blocked from this chat.');
+      return;
+    }
 
     const text = messageText.trim();
     setMessageText('');
     setSending(true);
 
+    // ── Only moderate in group chats ──
+    if (isGroup) {
+      const moderation = await moderateMessage(text, currentCheckin.name, warnCount);
+
+      if (!moderation.allowed) {
+        setSending(false);
+
+        // Show AI sarcastic reply in chat
+        if (moderation.aiReply) {
+          const aiMsg: Message = {
+            id: `ai-${Date.now()}`,
+            user_id: 'ai-moderator',
+            name: '🤖 MeetDestiny AI',
+            profession: 'Safety Moderator',
+            text: moderation.aiReply,
+            created_at: new Date().toISOString(),
+            is_ai: true,
+          };
+          setMessages(prev => [...prev, aiMsg]);
+          scrollToBottom();
+        }
+
+        if (moderation.shouldWarn) {
+          // First offense → warn
+          const newWarnCount = warnCount + 1;
+          setWarnCount(newWarnCount);
+          setShowWarnBanner(true);
+          setTimeout(() => setShowWarnBanner(false), 5000);
+
+          // Update warn count in DB
+          await supabase.from('user_profiles')
+            .update({ warn_count: newWarnCount, last_warned_at: new Date().toISOString() })
+            .eq('user_id', currentUserId);
+
+          toast.warning('⚠️ Warning: Keep it respectful! One more and you\'re out.');
+
+        } else if (moderation.shouldBlock) {
+          // Repeat offense → block from chat
+          setIsBlocked(true);
+          await supabase.from('user_profiles')
+            .update({ warn_count: warnCount + 1, is_banned: true })
+            .eq('user_id', currentUserId);
+
+          toast.error('🚫 You have been blocked from this chat for repeated violations.');
+        }
+
+        return;
+      }
+    }
+
+    // ── Message passed moderation — send it ──
     const tempId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
       id: tempId,
@@ -188,32 +344,27 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     }
   };
 
-  // ── Avatar component — Google photo with initials fallback ──
-  const Avatar = ({ name, avatarUrl, size = 32 }: { name: string; avatarUrl?: string; size?: number }) => {
+  // ── Avatar component ──────────────────────────────────────
+  const Avatar = ({ name, avatarUrl, size = 32, isAI = false }: { name: string; avatarUrl?: string; size?: number; isAI?: boolean }) => {
     const [imgFailed, setImgFailed] = useState(false);
     const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
+
+    if (isAI) {
+      return (
+        <div style={{ width: size, height: size, borderRadius: '50%', background: 'linear-gradient(135deg, #ef4444, #dc2626)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}>
+          <ShieldAlert style={{ width: size * 0.5, height: size * 0.5, color: '#fff' }} />
+        </div>
+      );
+    }
+
     if (avatarUrl && !imgFailed) {
       return (
-        <img
-          src={avatarUrl}
-          alt={name}
-          onError={() => setImgFailed(true)}
-          style={{
-            width: size, height: size, borderRadius: '50%',
-            objectFit: 'cover',
-            border: `1.5px solid ${accentColor}25`,
-            flexShrink: 0,
-          }}
-        />
+        <img src={avatarUrl} alt={name} onError={() => setImgFailed(true)}
+          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${accentColor}25`, flexShrink: 0 }} />
       );
     }
     return (
-      <div style={{
-        width: size, height: size, borderRadius: '50%',
-        background: `linear-gradient(135deg, ${accentColor}, ${isGroup ? '#E85A2B' : '#5b21b6'})`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: `0 2px 8px ${accentGlow}`, flexShrink: 0,
-      }}>
+      <div style={{ width: size, height: size, borderRadius: '50%', background: `linear-gradient(135deg, ${accentColor}, ${isGroup ? '#E85A2B' : '#5b21b6'})`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 8px ${accentGlow}`, flexShrink: 0 }}>
         <span style={{ fontSize: size * 0.34, fontWeight: 700, color: '#fff' }}>{initials}</span>
       </div>
     );
@@ -241,11 +392,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
   }
 
   return (
-    <div style={{
-      height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      background: 'linear-gradient(160deg, #E3F2FD 0%, #ffffff 45%, #FFE8E0 100%)',
-      fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', width: '100%',
-    }}>
+    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(160deg, #E3F2FD 0%, #ffffff 45%, #FFE8E0 100%)', fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', width: '100%' }}>
 
       {/* ── Header ── */}
       <div style={{ flexShrink: 0, padding: '14px 16px', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderBottom: `2px solid ${accentColor}20`, boxShadow: `0 2px 12px ${accentGlow}` }}>
@@ -265,6 +412,11 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
               <motion.div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }}
                 animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }} transition={{ duration: 2, repeat: Infinity }} />
               <span style={{ fontSize: 11, color: '#64748b' }}>{memberCount} members</span>
+              {isGroup && (
+                <span style={{ fontSize: 10, color: '#94a3b8', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 8, padding: '1px 6px', marginLeft: 2 }}>
+                  🤖 AI Moderated
+                </span>
+              )}
             </div>
           </div>
 
@@ -274,6 +426,32 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
           </motion.button>
         </div>
       </div>
+
+      {/* ── Warn Banner ── */}
+      <AnimatePresence>
+        {showWarnBanner && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            style={{ flexShrink: 0, background: 'rgba(234,179,8,0.12)', borderBottom: '1px solid rgba(234,179,8,0.3)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShieldAlert style={{ width: 14, height: 14, color: '#ca8a04', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: '#854d0e', fontWeight: 500 }}>
+              ⚠️ Warning {warnCount}/2 — Keep it respectful or you'll be blocked!
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Blocked Banner ── */}
+      {isBlocked && (
+        <div style={{ flexShrink: 0, background: 'rgba(239,68,68,0.1)', borderBottom: '1px solid rgba(239,68,68,0.2)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ShieldAlert style={{ width: 14, height: 14, color: '#ef4444', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
+            🚫 You've been blocked from sending messages in this chat.
+          </span>
+        </div>
+      )}
 
       {/* ── Messages ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 8px', scrollbarWidth: 'none', display: 'flex', flexDirection: 'column' }}>
@@ -290,7 +468,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
           <div style={{ flex: 1 }}>
             {groupedMessages.map((group) => (
               <div key={group.date}>
-                {/* Date separator */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0 12px' }}>
                   <div style={{ flex: 1, height: 1, background: 'rgba(148,163,184,0.2)' }} />
                   <span style={{ fontSize: 11, color: '#94a3b8', background: 'rgba(148,163,184,0.1)', padding: '3px 10px', borderRadius: 20, fontWeight: 500 }}>{group.date}</span>
@@ -300,11 +477,27 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                 <AnimatePresence mode="popLayout">
                   {group.msgs.map((message, index) => {
                     const isOwn = message.user_id === currentUserId;
+                    const isAIMsg = message.is_ai || message.user_id === 'ai-moderator';
                     const time = new Date(message.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
                     const prevMsg = group.msgs[index - 1];
                     const nextMsg = group.msgs[index + 1];
                     const showHeader = !prevMsg || prevMsg.user_id !== message.user_id;
                     const isLastInGroup = !nextMsg || nextMsg.user_id !== message.user_id;
+
+                    // ── AI moderation message — centered system style ──
+                    if (isAIMsg) {
+                      return (
+                        <motion.div key={message.id}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 16, padding: '8px 14px', maxWidth: '85%' }}>
+                            <ShieldAlert style={{ width: 14, height: 14, color: '#ef4444', flexShrink: 0 }} />
+                            <p style={{ fontSize: 13, color: '#dc2626', margin: 0, fontWeight: 500 }}>{message.text}</p>
+                          </div>
+                        </motion.div>
+                      );
+                    }
 
                     return (
                       <motion.div key={message.id}
@@ -313,7 +506,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                         transition={{ duration: 0.2 }}
                         style={{ display: 'flex', flexDirection: isOwn ? 'row-reverse' : 'row', gap: 8, marginBottom: isLastInGroup ? 10 : 3, alignItems: 'flex-end' }}>
 
-                        {/* ── Avatar — Google photo or initials fallback ── */}
                         {!isOwn && (
                           <div style={{ flexShrink: 0, width: 32, marginBottom: 2 }}>
                             {showHeader
@@ -324,8 +516,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                         )}
 
                         <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column', alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
-
-                          {/* Name + profession — only for others, only on first in group */}
                           {!isOwn && showHeader && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, paddingLeft: 4 }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{message.name}</span>
@@ -333,7 +523,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                             </div>
                           )}
 
-                          {/* Bubble */}
                           <div style={{
                             padding: '10px 14px',
                             borderRadius: isOwn ? '18px 4px 18px 18px' : '4px 18px 18px 18px',
@@ -346,7 +535,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                             <p style={{ fontSize: 14, color: isOwn ? '#fff' : '#0f172a', margin: 0, lineHeight: 1.55, wordBreak: 'break-word' }}>{message.text}</p>
                           </div>
 
-                          {/* Time + tick */}
                           {isLastInGroup && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>
                               <span style={{ fontSize: 10, color: '#94a3b8' }}>{time}</span>
@@ -380,43 +568,43 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       {/* ── Input ── */}
       <div style={{ flexShrink: 0, padding: '10px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderTop: `1px solid ${accentColor}12` }}>
         <form onSubmit={handleSend} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {/* Show sender's own Google avatar next to input */}
           <Avatar name={currentCheckin?.name || ''} avatarUrl={currentAvatar} size={36} />
-
           <input
             ref={inputRef}
             type="text"
-            placeholder={`Message ${chatTitle}...`}
+            placeholder={isBlocked ? '🚫 You are blocked from this chat' : `Message ${chatTitle}...`}
             value={messageText}
             onChange={e => setMessageText(e.target.value)}
+            disabled={isBlocked}
             style={{
               flex: 1, height: 46, borderRadius: 23,
-              border: `1.5px solid ${accentColor}25`,
-              background: 'rgba(255,255,255,0.95)',
+              border: `1.5px solid ${isBlocked ? 'rgba(239,68,68,0.3)' : `${accentColor}25`}`,
+              background: isBlocked ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.95)',
               padding: '0 18px', fontSize: 14, color: '#0f172a',
               outline: 'none', fontFamily: 'system-ui, sans-serif',
               transition: 'border-color 0.2s',
+              cursor: isBlocked ? 'not-allowed' : 'text',
             }}
-            onFocus={e => e.target.style.borderColor = `${accentColor}60`}
-            onBlur={e => e.target.style.borderColor = `${accentColor}25`}
+            onFocus={e => { if (!isBlocked) e.target.style.borderColor = `${accentColor}60`; }}
+            onBlur={e => { if (!isBlocked) e.target.style.borderColor = `${accentColor}25`; }}
           />
           <motion.button
             type="submit"
             whileTap={{ scale: 0.88 }}
-            disabled={!messageText.trim() || sending}
+            disabled={!messageText.trim() || sending || isBlocked}
             style={{
               width: 46, height: 46, borderRadius: '50%', border: 'none',
-              cursor: messageText.trim() ? 'pointer' : 'default',
-              background: messageText.trim()
+              cursor: messageText.trim() && !isBlocked ? 'pointer' : 'default',
+              background: messageText.trim() && !isBlocked
                 ? `linear-gradient(135deg, ${accentColor}, ${isGroup ? '#E85A2B' : '#5b21b6'})`
                 : 'rgba(148,163,184,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              boxShadow: messageText.trim() ? `0 4px 16px ${accentGlow}` : 'none',
+              boxShadow: messageText.trim() && !isBlocked ? `0 4px 16px ${accentGlow}` : 'none',
               transition: 'all 0.2s',
             }}>
             {sending
               ? <Loader2 style={{ width: 16, height: 16, color: '#fff' }} className="animate-spin" />
-              : <Send style={{ width: 15, height: 15, color: messageText.trim() ? '#fff' : '#94a3b8', marginLeft: 1 }} />
+              : <Send style={{ width: 15, height: 15, color: messageText.trim() && !isBlocked ? '#fff' : '#94a3b8', marginLeft: 1 }} />
             }
           </motion.button>
         </form>

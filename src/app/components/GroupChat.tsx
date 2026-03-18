@@ -114,7 +114,7 @@ Rules:
     return { allowed: true, shouldWarn: false, shouldBlock: false, aiReply: '' };
   }
 };
-
+console.log('Groq key:', import.meta.env.VITE_GROQ_API_KEY ? 'loaded ✅' : 'missing ❌');
 export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode }) => {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);

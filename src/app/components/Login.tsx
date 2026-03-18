@@ -194,23 +194,19 @@ function LoginForm({
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
           className="text-center"
-        >
-          {/* Logo / Icon */}
-          <motion.div
-            className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-[#1E88E5] to-[#FF6B35] flex items-center justify-center shadow-2xl"
-            animate={{ rotate: [0, 3, -3, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              {/* Two people meeting */}
-              <circle cx="14" cy="14" r="7" fill="white" opacity="0.95"/>
-              <path d="M4 32 Q14 40 24 32 Q22 24 14 24 Q6 24 4 32Z" fill="white" opacity="0.95"/>
-              <circle cx="34" cy="14" r="7" fill="white" opacity="0.6"/>
-              <path d="M24 32 Q34 40 44 32 Q42 24 34 24 Q26 24 24 32Z" fill="white" opacity="0.6"/>
-              {/* Connection dot */}
-              <circle cx="24" cy="18" r="3" fill="white" opacity="0.9"/>
-            </svg>
-          </motion.div>
+        >{/* Replace the animated square icon with your actual logo */}
+<motion.div
+  initial={{ opacity: 0, scale: 0.8 }}
+  animate={{ opacity: 1, scale: 1 }}
+  transition={{ delay: 0.3, duration: 0.6 }}
+  className="flex justify-center mb-2"
+>
+  <img
+    src="/meetdestiny-logo.svg"
+    alt="MeetDestiny"
+    className="w-48 h-auto"
+  />
+</motion.div>
 
           {/* App name */}
           <motion.div

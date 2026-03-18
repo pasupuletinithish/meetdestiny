@@ -214,6 +214,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         event: 'INSERT', schema: 'public', table: tableName,
         filter: `${filterField}=eq.${chatId}`,
       }, async (payload) => {
+          console.log('🔥 Realtime fired:', payload);
         const newMsg = payload.new as Message;
 
         // ✅ Get user ID directly — don't rely on state

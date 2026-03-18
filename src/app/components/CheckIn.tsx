@@ -12,6 +12,7 @@ type TabType = 'reserved-train' | 'reserved-bus' | 'route-match';
 
 interface RouteAnalysis {
   isValid: boolean;
+  estimatedDurationMinutes: number;
   estimatedTime: string;
   distance: string;
   highway: string;
@@ -19,7 +20,41 @@ interface RouteAnalysis {
   corridor: string[];
 }
 
-// ── Groq AI Route Analysis ────────────────────────────────────
+// ── AI: Get duration in minutes for any Indian route ──────────
+const getAIDuration = async (from: string, to: string): Promise<number> => {
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an Indian transport expert. Return ONLY a plain integer representing realistic road travel time in minutes between two Indian locations. No text, no JSON, just the number.',
+          },
+          {
+            role: 'user',
+            content: `Realistic road travel time in minutes from "${from}" to "${to}" in India. Account for Indian road conditions, traffic, and typical delays. Return ONLY the integer.`,
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 10,
+      }),
+    });
+    const data = await response.json();
+    const raw = data.choices?.[0]?.message?.content?.trim();
+    const minutes = parseInt(raw);
+    return isNaN(minutes) ? 360 : minutes; // fallback to 6hrs if parse fails
+  } catch {
+    return 360; // fallback to 6hrs
+  }
+};
+
+// ── AI: Full route analysis (Route Match tab) ─────────────────
 const analyzeRouteWithAI = async (from: string, to: string): Promise<RouteAnalysis | null> => {
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -33,61 +68,65 @@ const analyzeRouteWithAI = async (from: string, to: string): Promise<RouteAnalys
         messages: [
           {
             role: 'system',
-            content: `You are an Indian geography and transport expert. When given a from and to location in India, analyze the route and respond ONLY with a valid JSON object. No explanation, no markdown, just raw JSON.`,
+            content: 'You are an Indian geography and transport expert. Respond ONLY with raw JSON, no markdown, no explanation.',
           },
           {
             role: 'user',
             content: `Analyze the travel route from "${from}" to "${to}" in India.
-Return ONLY this JSON structure:
+Return ONLY this exact JSON:
 {
-  "isValid": true or false (is this a real travel route in India?),
-  "estimatedTime": "X hours Y mins" (realistic road/rail travel time),
-  "distance": "XXX km" (approximate distance),
-  "highway": "NH-XX or state highway name",
-  "majorStops": ["stop1", "stop2", "stop3"] (2-4 major towns/cities on the way),
-  "corridor": ["${from}", "stop1", "stop2", "${to}"] (full route corridor including start and end)
-}`,
+  "isValid": true,
+  "estimatedDurationMinutes": 390,
+  "estimatedTime": "6 hrs 30 mins",
+  "distance": "350 km",
+  "highway": "NH-48",
+  "majorStops": ["Vellore", "Krishnagiri", "Hosur"],
+  "corridor": ["${from}", "Vellore", "Krishnagiri", "Hosur", "${to}"]
+}
+Rules:
+- estimatedDurationMinutes = realistic Indian road travel time as plain integer
+- Account for Indian road conditions and delays
+- corridor must start with "${from}" and end with "${to}"
+- if not a valid Indian route, set isValid false and estimatedDurationMinutes to 0`,
           },
         ],
-        temperature: 0.2,
+        temperature: 0.1,
         max_tokens: 400,
       }),
     });
-
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     if (!content) return null;
-
-    // Clean and parse JSON
     const cleaned = content.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-    return parsed as RouteAnalysis;
+    return JSON.parse(cleaned) as RouteAnalysis;
   } catch (err) {
     console.error('Groq AI error:', err);
     return null;
   }
 };
 
+// ── Expiry: from AI duration + 1hr buffer ────────────────────
+const calculateExpiryFromDuration = (durationMinutes: number): string => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() + durationMinutes + 60);
+  return now.toISOString();
+};
+
 // ── Match travelers on corridor ───────────────────────────────
 const findCorridorMatches = async (corridor: string[]): Promise<number> => {
   try {
-    // Build OR query — match any checkin whose from/to overlaps with corridor stops
     const orConditions = corridor.flatMap(stop => [
       `from_location.ilike.%${stop}%`,
       `to_location.ilike.%${stop}%`,
     ]).join(',');
-
     const { count } = await supabase
       .from('checkins')
       .select('*', { count: 'exact', head: true })
       .or(orConditions)
       .eq('is_active', true)
       .gt('expires_at', new Date().toISOString());
-
     return count || 0;
-  } catch {
-    return 0;
-  }
+  } catch { return 0; }
 };
 
 // ── Compass Logo ──────────────────────────────────────────────
@@ -149,6 +188,8 @@ export const CheckIn: React.FC = () => {
   // Train
   const [pnr, setPnr] = useState('');
   const [pnrData, setPnrData] = useState<any>(null);
+  const [trainAIDuration, setTrainAIDuration] = useState<number | null>(null);
+  const [fetchingTrainDuration, setFetchingTrainDuration] = useState(false);
 
   // Bus
   const [busIdInput, setBusIdInput] = useState('');
@@ -156,13 +197,13 @@ export const CheckIn: React.FC = () => {
   const [busNotFound, setBusNotFound] = useState(false);
   const [manualFrom, setManualFrom] = useState('');
   const [manualTo, setManualTo] = useState('');
-  const [manualArrival, setManualArrival] = useState('');
   const [manualOperator, setManualOperator] = useState('');
+  const [busAIDuration, setBusAIDuration] = useState<number | null>(null);
+  const [fetchingBusDuration, setFetchingBusDuration] = useState(false);
 
   // Route Match
   const [routeFrom, setRouteFrom] = useState('');
   const [routeTo, setRouteTo] = useState('');
-  const [routeArrival, setRouteArrival] = useState('');
   const [routeAnalysis, setRouteAnalysis] = useState<RouteAnalysis | null>(null);
   const [corridorMatches, setCorridorMatches] = useState<number>(0);
   const [analyzingRoute, setAnalyzingRoute] = useState(false);
@@ -171,31 +212,10 @@ export const CheckIn: React.FC = () => {
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user?.user_metadata?.full_name) {
-        setUserName(user.user_metadata.full_name);
-      }
+      if (user?.user_metadata?.full_name) setUserName(user.user_metadata.full_name);
     };
     fetchUser();
   }, []);
-
-  const calculateExpiry = (arrivalTime: string, journeyDate?: string) => {
-    const now = new Date();
-    let hours = 0, minutes = 0;
-    if (arrivalTime.includes('AM') || arrivalTime.includes('PM')) {
-      const [time, modifier] = arrivalTime.split(' ');
-      const [h, m] = time.split(':').map(Number);
-      hours = modifier === 'PM' && h !== 12 ? h + 12 : modifier === 'AM' && h === 12 ? 0 : h;
-      minutes = m;
-    } else {
-      const [h, m] = arrivalTime.split(':').map(Number);
-      hours = h; minutes = m;
-    }
-    const arrival = journeyDate ? new Date(journeyDate) : new Date();
-    arrival.setHours(hours, minutes, 0, 0);
-    if (arrival <= now && !journeyDate) arrival.setDate(arrival.getDate() + 1);
-    arrival.setMinutes(arrival.getMinutes() + 30);
-    return arrival.toISOString();
-  };
 
   const fetchPNR = async () => {
     if (pnr.length < 10) { toast.error('Please enter a valid 10-digit PNR'); return; }
@@ -215,7 +235,17 @@ export const CheckIn: React.FC = () => {
       const data = await response.json();
       if (data && data.Destination) {
         setPnrData(data);
-        toast.success('PNR details fetched! 🚆');
+        toast.success('PNR fetched! Calculating realistic travel time... 🤖');
+        // Auto-trigger AI duration for train route
+        setFetchingTrainDuration(true);
+        const from = data.BoardingPoint || data.Origin;
+        const to = data.Destination;
+        const mins = await getAIDuration(from, to);
+        setTrainAIDuration(mins);
+        setFetchingTrainDuration(false);
+        const hrs = Math.floor(mins / 60);
+        const remainMins = mins % 60;
+        toast.success(`AI estimates ${hrs}h ${remainMins}m travel time 🚆`);
       } else {
         toast.error('Invalid PNR or no data found');
       }
@@ -228,6 +258,7 @@ export const CheckIn: React.FC = () => {
     setFetchingVehicle(true);
     setBusNotFound(false);
     setBusData(null);
+    setBusAIDuration(null);
     try {
       const { data } = await supabase
         .from('vehicles').select('*')
@@ -235,7 +266,15 @@ export const CheckIn: React.FC = () => {
         .maybeSingle();
       if (data) {
         setBusData(data);
-        toast.success(`${data.operator} — ${data.from_location} → ${data.to_location} ✅`);
+        toast.success(`${data.operator} found! Calculating travel time... 🤖`);
+        // Auto-trigger AI duration
+        setFetchingBusDuration(true);
+        const mins = await getAIDuration(data.from_location, data.to_location);
+        setBusAIDuration(mins);
+        setFetchingBusDuration(false);
+        const hrs = Math.floor(mins / 60);
+        const remainMins = mins % 60;
+        toast.success(`AI estimates ${hrs}h ${remainMins}m travel time 🚌`);
       } else {
         setBusNotFound(true);
         toast.info('Bus not registered yet — enter route details manually');
@@ -244,7 +283,17 @@ export const CheckIn: React.FC = () => {
     finally { setFetchingVehicle(false); }
   };
 
-  // ── AI Route Analysis ─────────────────────────────────────
+  const fetchManualBusDuration = async () => {
+    if (!manualFrom.trim() || !manualTo.trim()) return;
+    setFetchingBusDuration(true);
+    const mins = await getAIDuration(manualFrom, manualTo);
+    setBusAIDuration(mins);
+    setFetchingBusDuration(false);
+    const hrs = Math.floor(mins / 60);
+    const remainMins = mins % 60;
+    toast.success(`AI estimates ${hrs}h ${remainMins}m for this route 🤖`);
+  };
+
   const handleAnalyzeRoute = async () => {
     if (!routeFrom.trim() || !routeTo.trim()) {
       toast.error('Please enter both From and To locations');
@@ -253,53 +302,56 @@ export const CheckIn: React.FC = () => {
     setAnalyzingRoute(true);
     setRouteAnalysis(null);
     toast.info('🤖 AI is analyzing your route...');
-
     try {
       const analysis = await analyzeRouteWithAI(routeFrom, routeTo);
-
       if (!analysis || !analysis.isValid) {
-        toast.error('Could not find a valid route between these locations. Please check and try again.');
+        toast.error('Could not find a valid route. Please check locations and try again.');
         setAnalyzingRoute(false);
         return;
       }
-
       setRouteAnalysis(analysis);
-
-      // Find corridor matches
       const matches = await findCorridorMatches(analysis.corridor);
       setCorridorMatches(matches);
-
+      const hrs = Math.floor(analysis.estimatedDurationMinutes / 60);
+      const mins = analysis.estimatedDurationMinutes % 60;
       if (matches > 0) {
-        toast.success(`🎉 ${matches} traveler${matches > 1 ? 's' : ''} found on this route!`);
+        toast.success(`🎉 ${matches} traveler${matches > 1 ? 's' : ''} found! Est. ${hrs}h ${mins}m journey`);
       } else {
-        toast.success('Route analyzed! Be the first traveler on this route 🌟');
+        toast.success(`Route analyzed! Est. ${hrs}h ${mins}m — be the first traveler 🌟`);
       }
-    } catch {
-      toast.error('AI analysis failed. Please try again.');
-    } finally {
-      setAnalyzingRoute(false);
-    }
+    } catch { toast.error('AI analysis failed. Please try again.'); }
+    finally { setAnalyzingRoute(false); }
   };
 
   const handleTrainSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pnrData) { toast.error('Please fetch PNR details first'); return; }
     if (!profession.trim()) { toast.error('Please enter your profession'); return; }
+    if (!trainAIDuration) { toast.error('Still calculating travel time, please wait...'); return; }
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
+      // Use AI duration for accurate expiry
+      const expiresAt = calculateExpiryFromDuration(trainAIDuration);
       const arrivalTime = pnrData.DestinationArrival || '11:59 PM';
-      const expiresAt = calculateExpiry(arrivalTime, pnrData.DateOfJourney);
       const { error } = await supabase.from('checkins').insert({
         user_id: user.id, name: userName, profession,
         vehicle_id: pnrData.TrainNumber || pnr,
         from_location: pnrData.BoardingPoint || pnrData.Origin,
         to_location: pnrData.Destination,
-        arrival_time: arrivalTime, expires_at: expiresAt, is_active: true,
+        arrival_time: arrivalTime,
+        expires_at: expiresAt,
+        is_active: true,
       });
       if (error) throw error;
-      setCurrentUser({ name: userName, profession, vehicleId: pnrData.TrainNumber || pnr, from: pnrData.BoardingPoint || pnrData.Origin, to: pnrData.Destination, arrivalTime });
+      setCurrentUser({
+        name: userName, profession,
+        vehicleId: pnrData.TrainNumber || pnr,
+        from: pnrData.BoardingPoint || pnrData.Origin,
+        to: pnrData.Destination,
+        arrivalTime,
+      });
       toast.success('Checked in! Find your co-travelers 🚆');
       navigate('/discovery');
     } catch { toast.error('Check-in failed.'); }
@@ -311,19 +363,23 @@ export const CheckIn: React.FC = () => {
     const vehicleId = busData?.vehicle_number || busIdInput.trim() || `MANUAL-${Date.now()}`;
     const fromLocation = busData?.from_location || manualFrom;
     const toLocation = busData?.to_location || manualTo;
-    const arrivalTime = busData?.arrival_time || manualArrival || '11:59 PM';
     if (!fromLocation || !toLocation) { toast.error('Please enter route details'); return; }
     if (!profession.trim()) { toast.error('Please enter your profession'); return; }
+    if (!busAIDuration) { toast.error('Please wait for AI to calculate travel time'); return; }
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
-      const expiresAt = calculateExpiry(arrivalTime);
+      const expiresAt = calculateExpiryFromDuration(busAIDuration);
+      const arrivalTime = busData?.arrival_time || '11:59 PM';
       const { error } = await supabase.from('checkins').insert({
         user_id: user.id, name: userName, profession,
-        vehicle_id: vehicleId, from_location: fromLocation,
-        to_location: toLocation, arrival_time: arrivalTime,
-        expires_at: expiresAt, is_active: true,
+        vehicle_id: vehicleId,
+        from_location: fromLocation,
+        to_location: toLocation,
+        arrival_time: arrivalTime,
+        expires_at: expiresAt,
+        is_active: true,
       });
       if (error) throw error;
       setCurrentUser({ name: userName, profession, vehicleId, from: fromLocation, to: toLocation, arrivalTime });
@@ -341,31 +397,23 @@ export const CheckIn: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
-
-      // Use AI estimated time if no manual arrival set
-      const arrivalTime = routeArrival || routeAnalysis.estimatedTime || '11:59 PM';
-      const expiresAt = calculateExpiry(arrivalTime);
-
+      const expiresAt = calculateExpiryFromDuration(routeAnalysis.estimatedDurationMinutes);
       const { error } = await supabase.from('checkins').insert({
-        user_id: user.id,
-        name: userName,
-        profession,
+        user_id: user.id, name: userName, profession,
         vehicle_id: `ROUTE-${Date.now()}`,
         from_location: routeFrom.trim(),
         to_location: routeTo.trim(),
-        arrival_time: arrivalTime,
+        arrival_time: routeAnalysis.estimatedTime,
         expires_at: expiresAt,
         is_active: true,
       });
       if (error) throw error;
-
       setCurrentUser({
-        name: userName,
-        profession,
+        name: userName, profession,
         vehicleId: `ROUTE-${Date.now()}`,
         from: routeFrom,
         to: routeTo,
-        arrivalTime,
+        arrivalTime: routeAnalysis.estimatedTime,
       });
       toast.success('Checked in! Finding route matches 🗺️');
       navigate('/discovery');
@@ -378,6 +426,13 @@ export const CheckIn: React.FC = () => {
     { id: 'reserved-bus' as TabType, label: 'Bus', icon: Bus, color: '#FF6B35' },
     { id: 'route-match' as TabType, label: 'Route Match', icon: Navigation, color: '#22c55e' },
   ];
+
+  // Helper: format minutes to human readable
+  const formatDuration = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${m}m`;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#E3F2FD] via-white to-[#FFE8E0] overflow-hidden relative">
@@ -394,28 +449,23 @@ export const CheckIn: React.FC = () => {
 
       <div className="relative z-10 flex flex-col min-h-screen">
 
-        {/* ── Header ── */}
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="flex items-center justify-center gap-3 px-4 pt-12 pb-4"
         >
-          <motion.div
-            animate={{ rotate: [0, 5, -5, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-          >
+          <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}>
             <CompassLogo />
           </motion.div>
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-[#534AB7] to-[#D4537E] bg-clip-text text-transparent">
-              MeetDestiny
-            </h1>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-[#534AB7] to-[#D4537E] bg-clip-text text-transparent">MeetDestiny</h1>
             <p className="text-xs text-gray-500">Start your journey</p>
           </div>
         </motion.div>
 
-        {/* ── Tabs ── */}
+        {/* Tabs */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -428,14 +478,12 @@ export const CheckIn: React.FC = () => {
                 key={tab.id}
                 onClick={() => {
                   setActiveTab(tab.id);
-                  setBusData(null);
-                  setBusNotFound(false);
-                  setRouteAnalysis(null);
+                  setBusData(null); setBusNotFound(false);
+                  setRouteAnalysis(null); setBusAIDuration(null);
+                  setTrainAIDuration(null); setPnrData(null);
                 }}
                 className={`flex-1 flex flex-col items-center gap-1 py-3 px-1 rounded-xl text-xs font-medium transition-all duration-300 ${
-                  activeTab === tab.id
-                    ? 'bg-white shadow-md text-gray-800'
-                    : 'text-gray-400 hover:text-gray-600'
+                  activeTab === tab.id ? 'bg-white shadow-md text-gray-800' : 'text-gray-400 hover:text-gray-600'
                 }`}
               >
                 <tab.icon className="w-5 h-5" style={{ color: activeTab === tab.id ? tab.color : undefined }} />
@@ -445,7 +493,7 @@ export const CheckIn: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* ── Form Area ── */}
+        {/* Form Area */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -483,48 +531,25 @@ export const CheckIn: React.FC = () => {
 
               {/* ── TRAIN TAB ── */}
               {activeTab === 'reserved-train' && (
-                <motion.form
-                  key="train"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.25 }}
-                  onSubmit={handleTrainSubmit}
-                  className="space-y-4"
-                >
+                <motion.form key="train" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }} onSubmit={handleTrainSubmit} className="space-y-4">
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1.5">
                       <Train className="w-3.5 h-3.5 text-[#1E88E5]" /> PNR Number
                     </label>
                     <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        placeholder="Enter 10-digit PNR"
-                        value={pnr}
-                        onChange={(e) => setPnr(e.target.value)}
-                        maxLength={10}
-                        className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#1E88E5] bg-white text-sm"
-                      />
-                      <Button
-                        type="button"
-                        onClick={fetchPNR}
-                        disabled={fetchingVehicle || pnr.length < 10}
-                        className="h-12 px-4 rounded-xl bg-[#1E88E5] hover:bg-[#1565C0] text-white shrink-0"
-                      >
+                      <Input type="number" placeholder="Enter 10-digit PNR" value={pnr}
+                        onChange={(e) => setPnr(e.target.value)} maxLength={10}
+                        className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#1E88E5] bg-white text-sm" />
+                      <Button type="button" onClick={fetchPNR} disabled={fetchingVehicle || pnr.length < 10}
+                        className="h-12 px-4 rounded-xl bg-[#1E88E5] hover:bg-[#1565C0] text-white shrink-0">
                         {fetchingVehicle ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                       </Button>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      🔒 PNR is only used to fetch journey details — never stored.
-                    </p>
+                    <p className="text-xs text-gray-400 mt-1.5">🔒 PNR only used to fetch journey details — never stored.</p>
                   </div>
 
                   {pnrData && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-blue-50 border-2 border-[#1E88E5]/20 rounded-2xl p-4"
-                    >
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-blue-50 border-2 border-[#1E88E5]/20 rounded-2xl p-4">
                       <p className="text-xs font-semibold text-[#1E88E5] uppercase tracking-wide mb-3 flex items-center gap-1.5">
                         <Train className="w-3.5 h-3.5" /> Journey Details
                       </p>
@@ -533,17 +558,32 @@ export const CheckIn: React.FC = () => {
                         <div><span className="text-gray-400 text-xs block">Date</span><p className="font-medium text-gray-800">{pnrData.DateOfJourney}</p></div>
                         <div><span className="text-gray-400 text-xs block">From</span><p className="font-medium text-gray-800">{pnrData.BoardingPoint || pnrData.Origin}</p></div>
                         <div><span className="text-gray-400 text-xs block">To</span><p className="font-medium text-gray-800">{pnrData.Destination}</p></div>
-                        <div><span className="text-gray-400 text-xs block">Arrival</span><p className="font-medium text-gray-800">{pnrData.DestinationArrival}</p></div>
+                        <div><span className="text-gray-400 text-xs block">Scheduled Arrival</span><p className="font-medium text-gray-800">{pnrData.DestinationArrival}</p></div>
                         <div><span className="text-gray-400 text-xs block">Class</span><p className="font-medium text-gray-800">{pnrData.Class}</p></div>
+                      </div>
+                      {/* AI Duration badge */}
+                      <div className="mt-3 pt-3 border-t border-blue-100">
+                        {fetchingTrainDuration ? (
+                          <div className="flex items-center gap-2 text-xs text-[#1E88E5]">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            AI calculating realistic travel time...
+                          </div>
+                        ) : trainAIDuration ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 bg-blue-100 rounded-lg px-3 py-1.5">
+                              <Clock className="w-3.5 h-3.5 text-[#1E88E5]" />
+                              <span className="text-xs font-semibold text-[#1E88E5]">
+                                🤖 AI estimate: {formatDuration(trainAIDuration)} + 1hr buffer
+                              </span>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     </motion.div>
                   )}
 
-                  <Button
-                    type="submit"
-                    disabled={loading || !pnrData || !profession.trim()}
-                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#1E88E5] to-[#1565C0] text-white font-medium shadow-lg disabled:opacity-50 text-base"
-                  >
+                  <Button type="submit" disabled={loading || !pnrData || !profession.trim() || !trainAIDuration}
+                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#1E88E5] to-[#1565C0] text-white font-medium shadow-lg disabled:opacity-50 text-base">
                     {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : '🚆 Start Networking'}
                   </Button>
                 </motion.form>
@@ -551,45 +591,26 @@ export const CheckIn: React.FC = () => {
 
               {/* ── BUS TAB ── */}
               {activeTab === 'reserved-bus' && (
-                <motion.form
-                  key="bus"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.25 }}
-                  onSubmit={handleBusSubmit}
-                  className="space-y-4"
-                >
+                <motion.form key="bus" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }} onSubmit={handleBusSubmit} className="space-y-4">
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1.5">
                       <Bus className="w-3.5 h-3.5 text-[#FF6B35]" /> Bus ID
                       <span className="text-gray-400 font-normal">(sticker on bus)</span>
                     </label>
                     <div className="flex gap-2">
-                      <Input
-                        type="text"
-                        placeholder="e.g., KSRTC-4X7K"
+                      <Input type="text" placeholder="e.g., KSRTC-4X7K"
                         value={busIdInput}
-                        onChange={(e) => { setBusIdInput(e.target.value.toUpperCase()); setBusData(null); setBusNotFound(false); }}
-                        className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#FF6B35] bg-white font-mono text-sm"
-                      />
-                      <Button
-                        type="button"
-                        onClick={fetchBusById}
-                        disabled={fetchingVehicle || !busIdInput.trim()}
-                        className="h-12 px-4 rounded-xl bg-[#FF6B35] hover:bg-[#E85A2B] text-white shrink-0"
-                      >
+                        onChange={(e) => { setBusIdInput(e.target.value.toUpperCase()); setBusData(null); setBusNotFound(false); setBusAIDuration(null); }}
+                        className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#FF6B35] bg-white font-mono text-sm" />
+                      <Button type="button" onClick={fetchBusById} disabled={fetchingVehicle || !busIdInput.trim()}
+                        className="h-12 px-4 rounded-xl bg-[#FF6B35] hover:bg-[#E85A2B] text-white shrink-0">
                         {fetchingVehicle ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                       </Button>
                     </div>
                   </div>
 
                   {busData && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-orange-50 border-2 border-[#FF6B35]/20 rounded-2xl p-4"
-                    >
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-orange-50 border-2 border-[#FF6B35]/20 rounded-2xl p-4">
                       <p className="text-xs font-semibold text-[#FF6B35] uppercase tracking-wide mb-3 flex items-center gap-1.5">
                         <Bus className="w-3.5 h-3.5" /> ✅ Bus Found
                       </p>
@@ -598,45 +619,73 @@ export const CheckIn: React.FC = () => {
                         <div><span className="text-gray-400 text-xs block">Type</span><p className="font-medium text-gray-800">{busData.vehicle_type}</p></div>
                         <div><span className="text-gray-400 text-xs block">From</span><p className="font-medium text-gray-800">{busData.from_location}</p></div>
                         <div><span className="text-gray-400 text-xs block">To</span><p className="font-medium text-gray-800">{busData.to_location}</p></div>
-                        <div><span className="text-gray-400 text-xs block">Departs</span><p className="font-medium text-gray-800">{busData.departure_time}</p></div>
-                        <div><span className="text-gray-400 text-xs block">Arrives</span><p className="font-medium text-gray-800">{busData.arrival_time}</p></div>
+                      </div>
+                      {/* AI Duration badge */}
+                      <div className="mt-3 pt-3 border-t border-orange-100">
+                        {fetchingBusDuration ? (
+                          <div className="flex items-center gap-2 text-xs text-[#FF6B35]">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            AI calculating realistic travel time...
+                          </div>
+                        ) : busAIDuration ? (
+                          <div className="flex items-center gap-1.5 bg-orange-100 rounded-lg px-3 py-1.5">
+                            <Clock className="w-3.5 h-3.5 text-[#FF6B35]" />
+                            <span className="text-xs font-semibold text-[#FF6B35]">
+                              🤖 AI estimate: {formatDuration(busAIDuration)} + 1hr buffer
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     </motion.div>
                   )}
 
+                  {/* Manual fallback */}
                   {busNotFound && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-3"
-                    >
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                       <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3">
                         <p className="text-xs font-semibold text-amber-700 mb-1">⚠️ Bus not registered yet</p>
-                        <p className="text-xs text-amber-600">Enter route details manually — we'll register it soon!</p>
+                        <p className="text-xs text-amber-600">Enter route details — AI will calculate travel time!</p>
                       </div>
-                      <Input type="text" placeholder="Bus Operator (e.g., NueGo, KSRTC)" value={manualOperator} onChange={(e) => setManualOperator(e.target.value)} className="h-12 rounded-xl border-2 border-gray-200 bg-white text-sm" />
+                      <Input type="text" placeholder="Bus Operator (e.g., NueGo, KSRTC)" value={manualOperator}
+                        onChange={(e) => setManualOperator(e.target.value)}
+                        className="h-12 rounded-xl border-2 border-gray-200 bg-white text-sm" />
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-gray-600 mb-1 block">From City *</label>
-                          <Input type="text" placeholder="Bangalore" value={manualFrom} onChange={(e) => setManualFrom(e.target.value)} className="h-12 rounded-xl border-2 border-gray-200 bg-white text-sm" />
+                          <Input type="text" placeholder="Bangalore" value={manualFrom}
+                            onChange={(e) => { setManualFrom(e.target.value); setBusAIDuration(null); }}
+                            className="h-12 rounded-xl border-2 border-gray-200 bg-white text-sm" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-gray-600 mb-1 block">To City *</label>
-                          <Input type="text" placeholder="Chennai" value={manualTo} onChange={(e) => setManualTo(e.target.value)} className="h-12 rounded-xl border-2 border-gray-200 bg-white text-sm" />
+                          <Input type="text" placeholder="Chennai" value={manualTo}
+                            onChange={(e) => { setManualTo(e.target.value); setBusAIDuration(null); }}
+                            className="h-12 rounded-xl border-2 border-gray-200 bg-white text-sm" />
                         </div>
                       </div>
-                      <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Estimated Arrival *</label>
-                        <Input type="time" value={manualArrival} onChange={(e) => setManualArrival(e.target.value)} className="h-12 rounded-xl border-2 border-gray-200 bg-white text-sm" />
-                      </div>
+                      {/* AI calculate button for manual entry */}
+                      <Button type="button" onClick={fetchManualBusDuration}
+                        disabled={fetchingBusDuration || !manualFrom.trim() || !manualTo.trim()}
+                        className="w-full h-11 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border-2 border-amber-200 font-medium">
+                        {fetchingBusDuration ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" /> AI calculating...
+                          </span>
+                        ) : '🤖 Calculate Travel Time with AI'}
+                      </Button>
+                      {busAIDuration && (
+                        <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          <span className="text-xs font-semibold text-amber-700">
+                            🤖 AI estimate: {formatDuration(busAIDuration)} + 1hr buffer
+                          </span>
+                        </div>
+                      )}
                     </motion.div>
                   )}
 
-                  <Button
-                    type="submit"
-                    disabled={loading || (!busData && !busNotFound)}
-                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#FF6B35] to-[#E85A2B] text-white font-medium shadow-lg disabled:opacity-50 text-base"
-                  >
+                  <Button type="submit" disabled={loading || (!busData && !busNotFound) || !busAIDuration}
+                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#FF6B35] to-[#E85A2B] text-white font-medium shadow-lg disabled:opacity-50 text-base">
                     {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : '🚌 Start Networking'}
                   </Button>
                 </motion.form>
@@ -644,82 +693,48 @@ export const CheckIn: React.FC = () => {
 
               {/* ── ROUTE MATCH TAB ── */}
               {activeTab === 'route-match' && (
-                <motion.form
-                  key="route"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.25 }}
-                  onSubmit={handleRouteSubmit}
-                  className="space-y-4"
-                >
+                <motion.form key="route" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }} onSubmit={handleRouteSubmit} className="space-y-4">
                   <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                     <p className="text-xs text-green-700 font-medium">🤖 AI-powered route matching</p>
-                    <p className="text-xs text-green-600 mt-0.5">Enter your start and end — our AI figures out the route, travel time and finds co-travelers even from nearby villages!</p>
+                    <p className="text-xs text-green-600 mt-0.5">Enter your start and end — AI figures out the route, realistic travel time and finds co-travelers even from nearby villages!</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-[#22c55e]" /> From
-                      </label>
-                      <Input
-                        type="text"
-                        placeholder="e.g., Shadnagar"
-                        value={routeFrom}
+                      <label className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1"><MapPin className="w-3 h-3 text-[#22c55e]" /> From</label>
+                      <Input type="text" placeholder="e.g., Shadnagar" value={routeFrom}
                         onChange={(e) => { setRouteFrom(e.target.value); setRouteAnalysis(null); }}
-                        className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#22c55e] bg-white text-sm"
-                      />
+                        className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#22c55e] bg-white text-sm" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-[#22c55e]" /> To
-                      </label>
-                      <Input
-                        type="text"
-                        placeholder="e.g., Bangalore"
-                        value={routeTo}
+                      <label className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1"><MapPin className="w-3 h-3 text-[#22c55e]" /> To</label>
+                      <Input type="text" placeholder="e.g., Bangalore" value={routeTo}
                         onChange={(e) => { setRouteTo(e.target.value); setRouteAnalysis(null); }}
-                        className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#22c55e] bg-white text-sm"
-                      />
+                        className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#22c55e] bg-white text-sm" />
                     </div>
                   </div>
 
-                  {/* AI Analyze Button */}
-                  <Button
-                    type="button"
-                    onClick={handleAnalyzeRoute}
+                  <Button type="button" onClick={handleAnalyzeRoute}
                     disabled={analyzingRoute || !routeFrom.trim() || !routeTo.trim()}
-                    className="w-full h-12 rounded-xl bg-green-50 hover:bg-green-100 text-[#22c55e] border-2 border-green-200 font-medium transition-all disabled:opacity-50"
-                  >
+                    className="w-full h-12 rounded-xl bg-green-50 hover:bg-green-100 text-[#22c55e] border-2 border-green-200 font-medium disabled:opacity-50">
                     {analyzingRoute ? (
                       <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        AI analyzing route...
+                        <Loader2 className="w-4 h-4 animate-spin" /> AI analyzing route...
                       </span>
-                    ) : (
-                      '🤖 Analyze Route with AI'
-                    )}
+                    ) : '🤖 Analyze Route with AI'}
                   </Button>
 
-                  {/* AI Analysis Result */}
                   {routeAnalysis && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-3"
-                    >
-                      {/* Route info card */}
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                       <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-4">
                         <p className="text-xs font-semibold text-[#22c55e] uppercase tracking-wide mb-3 flex items-center gap-1.5">
                           <Route className="w-3.5 h-3.5" /> AI Route Analysis
                         </p>
                         <div className="grid grid-cols-2 gap-2.5 text-sm mb-3">
                           <div>
-                            <span className="text-gray-400 text-xs block flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> Travel Time
-                            </span>
+                            <span className="text-gray-400 text-xs block flex items-center gap-1"><Clock className="w-3 h-3" /> Travel Time</span>
                             <p className="font-semibold text-gray-800">{routeAnalysis.estimatedTime}</p>
+                            <p className="text-xs text-green-600">+1hr buffer included</p>
                           </div>
                           <div>
                             <span className="text-gray-400 text-xs block">Distance</span>
@@ -730,8 +745,7 @@ export const CheckIn: React.FC = () => {
                             <p className="font-medium text-gray-800">{routeAnalysis.highway}</p>
                           </div>
                         </div>
-
-                        {/* Route corridor visualization */}
+                        {/* Corridor */}
                         {routeAnalysis.corridor.length > 0 && (
                           <div>
                             <p className="text-xs text-gray-400 mb-2">Route corridor</p>
@@ -742,12 +756,8 @@ export const CheckIn: React.FC = () => {
                                     i === 0 || i === routeAnalysis.corridor.length - 1
                                       ? 'bg-[#22c55e] text-white font-medium'
                                       : 'bg-white border border-green-200 text-gray-600'
-                                  }`}>
-                                    {stop}
-                                  </span>
-                                  {i < routeAnalysis.corridor.length - 1 && (
-                                    <span className="text-gray-300 text-xs">→</span>
-                                  )}
+                                  }`}>{stop}</span>
+                                  {i < routeAnalysis.corridor.length - 1 && <span className="text-gray-300 text-xs">→</span>}
                                 </React.Fragment>
                               ))}
                             </div>
@@ -755,14 +765,12 @@ export const CheckIn: React.FC = () => {
                         )}
                       </div>
 
-                      {/* Traveler matches */}
+                      {/* Matches */}
                       <div className={`rounded-2xl p-4 text-center border-2 ${corridorMatches > 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
                         {corridorMatches > 0 ? (
                           <>
                             <p className="text-3xl font-bold text-[#22c55e]">{corridorMatches}</p>
-                            <p className="text-sm text-gray-600 mt-1">
-                              traveler{corridorMatches > 1 ? 's' : ''} on this corridor right now!
-                            </p>
+                            <p className="text-sm text-gray-600 mt-1">traveler{corridorMatches > 1 ? 's' : ''} on this corridor right now!</p>
                           </>
                         ) : (
                           <>
@@ -771,28 +779,11 @@ export const CheckIn: React.FC = () => {
                           </>
                         )}
                       </div>
-
-                      {/* Optional manual arrival override */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-[#22c55e]" /> Arrival Time
-                          <span className="text-gray-400 font-normal">(optional — AI estimated {routeAnalysis.estimatedTime})</span>
-                        </label>
-                        <Input
-                          type="time"
-                          value={routeArrival}
-                          onChange={(e) => setRouteArrival(e.target.value)}
-                          className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#22c55e] bg-white text-sm"
-                        />
-                      </div>
                     </motion.div>
                   )}
 
-                  <Button
-                    type="submit"
-                    disabled={loading || !routeAnalysis || !profession.trim()}
-                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-white font-medium shadow-lg disabled:opacity-50 text-base"
-                  >
+                  <Button type="submit" disabled={loading || !routeAnalysis || !profession.trim()}
+                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-white font-medium shadow-lg disabled:opacity-50 text-base">
                     {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : '🗺️ Start Networking'}
                   </Button>
                 </motion.form>
@@ -801,12 +792,8 @@ export const CheckIn: React.FC = () => {
           </div>
 
           {/* Safe travels note */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="mt-4 bg-white/60 backdrop-blur border border-white/40 rounded-2xl p-4 shadow-sm"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
+            className="mt-4 bg-white/60 backdrop-blur border border-white/40 rounded-2xl p-4 shadow-sm">
             <p className="text-xs text-gray-500 text-center">
               ✨ <span className="font-medium text-gray-700">Safe travels!</span> Your check-in expires automatically when you reach your destination.
             </p>

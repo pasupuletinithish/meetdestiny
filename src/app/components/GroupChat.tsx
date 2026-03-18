@@ -14,7 +14,8 @@ interface Message {
   avatar_url?: string;
   created_at: string;
   pending?: boolean;
-  is_ai?: boolean; // AI moderation message flag
+  is_ai?: boolean;
+  is_flagged?: boolean;
 }
 
 interface CheckinData {
@@ -49,12 +50,12 @@ const moderateMessage = async (
         messages: [
           {
             role: 'system',
-            content: `You are MeetDestiny's AI safety moderator for an Indian travel social app. 
+            content: `You are MeetDestiny's AI safety moderator for an Indian travel social app.
 Your job is to moderate group chat messages between travelers on buses and trains in India.
 
 Analyze messages for:
 - Abusive language, slurs, hate speech
-- Sexual harassment or inappropriate content
+- Sexual harassment or inappropriate content (e.g. "sexy", "hot figure", suggestive compliments to strangers)
 - Spam or fake/irrelevant content
 - Scam attempts or suspicious links
 - Threats or violent content
@@ -69,15 +70,17 @@ Respond ONLY with this exact JSON:
 }
 
 Rules:
-- "allowed": false only for genuine violations
-- "mild" = first warning worthy (mild abuse, borderline content)  
-- "severe" = instant action worthy (sexual content, threats, slurs)
+- "allowed": false for ANY sexual comment, harassment, or inappropriate compliment to strangers
+- "mild" = first warning worthy (mild abuse, borderline content, inappropriate compliments)
+- "severe" = instant action worthy (explicit sexual content, threats, slurs)
 - ai_reply must be witty, sarcastic and short (max 15 words) if violation
-- ai_reply examples: 
+- ai_reply examples:
   "Oh wow, groundbreaking vocabulary! Maybe try actual words? 🙄"
   "Congrats on finding the block button so fast! 🏆"
   "This isn't that kind of journey, friend. Try again. 👋"
   "Our AI is embarrassed for you. Really. 😬"
+  "Complimenting strangers like that? Bold move. Not allowed here. 🚫"
+  "Sir this is a travel app, not a dating app. 😂"
 - Normal travel chat, greetings, questions are ALWAYS allowed`,
           },
           {
@@ -108,7 +111,6 @@ Rules:
       aiReply: parsed.ai_reply || '',
     };
   } catch {
-    // If AI fails, allow the message (don't block legitimate messages)
     return { allowed: true, shouldWarn: false, shouldBlock: false, aiReply: '' };
   }
 };
@@ -149,7 +151,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       if (!user) { navigate('/'); return; }
       setCurrentUserId(user.id);
 
-      // Fetch avatar + warn count
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('avatar_url, warn_count, is_banned')
@@ -159,8 +160,8 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       const avatar = profile?.avatar_url || user.user_metadata?.avatar_url || '';
       setCurrentAvatar(avatar);
       setWarnCount(profile?.warn_count || 0);
+      setIsBlocked(profile?.is_banned || false);
 
-      // If banned → kick out
       if (profile?.is_banned) {
         toast.error('Your account has been suspended.');
         navigate('/');
@@ -177,9 +178,11 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
 
       const chatId = isGroup ? checkin.vehicle_id : checkin.to_location;
 
+      // Fetch messages — exclude flagged ones
       const { data: msgs } = await supabase
         .from(tableName).select('*')
         .eq(filterField, chatId)
+        .eq('is_flagged', false)
         .order('created_at', { ascending: true });
       setMessages(msgs || []);
 
@@ -201,22 +204,83 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     init();
   }, [navigate, mode, isGroup, tableName, filterField, scrollToBottom]);
 
-  // Realtime
+  // ── Realtime with AI moderation on incoming messages ──────
   useEffect(() => {
-    if (!currentCheckin) return;
+    if (!currentCheckin || !currentUserId) return;
     const chatId = isGroup ? currentCheckin.vehicle_id : currentCheckin.to_location;
 
     const channel = supabase.channel(`${mode}-chat-${chatId}`)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: tableName,
         filter: `${filterField}=eq.${chatId}`,
-      }, (payload) => {
+      }, async (payload) => {
         const newMsg = payload.new as Message;
-        setMessages(prev => {
-          if (pendingIds.current.has(newMsg.id)) {
-            pendingIds.current.delete(newMsg.id);
-            return prev.map(m => m.id === newMsg.id ? { ...newMsg, pending: false } : m);
+
+        // ── Own messages — just replace optimistic ──
+        if (newMsg.user_id === currentUserId) {
+          setMessages(prev => {
+            if (pendingIds.current.has(newMsg.id)) {
+              pendingIds.current.delete(newMsg.id);
+              return prev.map(m => m.id === newMsg.id ? { ...newMsg, pending: false } : m);
+            }
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+          scrollToBottom();
+          return;
+        }
+
+        // ── Incoming messages from OTHERS — run AI moderation ──
+        if (isGroup) {
+          const moderation = await moderateMessage(newMsg.text, newMsg.name, 0);
+
+          if (!moderation.allowed) {
+            // Flag message in DB
+            await supabase.from(tableName)
+              .update({ is_flagged: true })
+              .eq('id', newMsg.id);
+
+            // Show AI sarcastic reply to everyone
+            const aiMsg: Message = {
+              id: `ai-${Date.now()}`,
+              user_id: 'ai-moderator',
+              name: '🤖 MeetDestiny AI',
+              profession: 'Safety Moderator',
+              text: moderation.aiReply || '⚠️ A message was removed for violating community guidelines.',
+              created_at: new Date().toISOString(),
+              is_ai: true,
+            };
+
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, aiMsg];
+            });
+
+            // Warn or ban sender in DB
+            if (moderation.shouldBlock) {
+              await supabase.from('user_profiles')
+                .update({ is_banned: true, warn_count: 2 })
+                .eq('user_id', newMsg.user_id);
+            } else if (moderation.shouldWarn) {
+              try {
+  await supabase.rpc('increment_warn_count', {
+    target_user_id: newMsg.user_id,
+  });
+} catch {
+  await supabase.from('user_profiles')
+    .update({ warn_count: 1, last_warned_at: new Date().toISOString() })
+    .eq('user_id', newMsg.user_id);
+}
+              
+            }
+
+            scrollToBottom();
+            return;
           }
+        }
+
+        // ── Message passed moderation — show normally ──
+        setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
@@ -224,9 +288,9 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       }).subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [currentCheckin, mode, isGroup, tableName, filterField, scrollToBottom]);
+  }, [currentCheckin, currentUserId, mode, isGroup, tableName, filterField, scrollToBottom]);
 
-  // ── Send with AI moderation ───────────────────────────────
+  // ── Send with AI moderation (own messages) ────────────────
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageText.trim() || !currentCheckin || !currentUserId || sending) return;
@@ -239,14 +303,14 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     setMessageText('');
     setSending(true);
 
-    // ── Only moderate in group chats ──
+    // Moderate own message before sending (group only)
     if (isGroup) {
       const moderation = await moderateMessage(text, currentCheckin.name, warnCount);
 
       if (!moderation.allowed) {
         setSending(false);
 
-        // Show AI sarcastic reply in chat
+        // Show AI reply
         if (moderation.aiReply) {
           const aiMsg: Message = {
             id: `ai-${Date.now()}`,
@@ -262,34 +326,26 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         }
 
         if (moderation.shouldWarn) {
-          // First offense → warn
           const newWarnCount = warnCount + 1;
           setWarnCount(newWarnCount);
           setShowWarnBanner(true);
           setTimeout(() => setShowWarnBanner(false), 5000);
-
-          // Update warn count in DB
           await supabase.from('user_profiles')
             .update({ warn_count: newWarnCount, last_warned_at: new Date().toISOString() })
             .eq('user_id', currentUserId);
-
-          toast.warning('⚠️ Warning: Keep it respectful! One more and you\'re out.');
-
+          toast.warning(`⚠️ Warning ${newWarnCount}/2 — Keep it respectful!`);
         } else if (moderation.shouldBlock) {
-          // Repeat offense → block from chat
           setIsBlocked(true);
           await supabase.from('user_profiles')
-            .update({ warn_count: warnCount + 1, is_banned: true })
+            .update({ warn_count: 2, is_banned: true })
             .eq('user_id', currentUserId);
-
-          toast.error('🚫 You have been blocked from this chat for repeated violations.');
+          toast.error('🚫 You have been blocked for repeated violations.');
         }
-
         return;
       }
     }
 
-    // ── Message passed moderation — send it ──
+    // ── Send message ──
     const tempId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
       id: tempId,
@@ -310,6 +366,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       profession: currentCheckin.profession,
       text,
       avatar_url: currentAvatar,
+      is_flagged: 'false',
     };
     if (isGroup) payload.vehicle_id = currentCheckin.vehicle_id;
     else payload.destination = currentCheckin.to_location;
@@ -345,7 +402,9 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
   };
 
   // ── Avatar component ──────────────────────────────────────
-  const Avatar = ({ name, avatarUrl, size = 32, isAI = false }: { name: string; avatarUrl?: string; size?: number; isAI?: boolean }) => {
+  const Avatar = ({ name, avatarUrl, size = 32, isAI = false }: {
+    name: string; avatarUrl?: string; size?: number; isAI?: boolean;
+  }) => {
     const [imgFailed, setImgFailed] = useState(false);
     const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
 
@@ -356,7 +415,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         </div>
       );
     }
-
     if (avatarUrl && !imgFailed) {
       return (
         <img src={avatarUrl} alt={name} onError={() => setImgFailed(true)}
@@ -408,12 +466,12 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{chatTitle}</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
               <motion.div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }}
                 animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }} transition={{ duration: 2, repeat: Infinity }} />
               <span style={{ fontSize: 11, color: '#64748b' }}>{memberCount} members</span>
               {isGroup && (
-                <span style={{ fontSize: 10, color: '#94a3b8', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 8, padding: '1px 6px', marginLeft: 2 }}>
+                <span style={{ fontSize: 10, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 8, padding: '1px 6px' }}>
                   🤖 AI Moderated
                 </span>
               )}
@@ -484,16 +542,19 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                     const showHeader = !prevMsg || prevMsg.user_id !== message.user_id;
                     const isLastInGroup = !nextMsg || nextMsg.user_id !== message.user_id;
 
-                    // ── AI moderation message — centered system style ──
+                    // ── AI system message — centered ──
                     if (isAIMsg) {
                       return (
                         <motion.div key={message.id}
                           initial={{ opacity: 0, scale: 0.9 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 16, padding: '8px 14px', maxWidth: '85%' }}>
-                            <ShieldAlert style={{ width: 14, height: 14, color: '#ef4444', flexShrink: 0 }} />
-                            <p style={{ fontSize: 13, color: '#dc2626', margin: 0, fontWeight: 500 }}>{message.text}</p>
+                          style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 16, padding: '10px 14px', maxWidth: '88%' }}>
+                            <ShieldAlert style={{ width: 15, height: 15, color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
+                            <div>
+                              <p style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', margin: '0 0 3px' }}>MeetDestiny AI</p>
+                              <p style={{ fontSize: 13, color: '#dc2626', margin: 0, lineHeight: 1.4 }}>{message.text}</p>
+                            </div>
                           </div>
                         </motion.div>
                       );

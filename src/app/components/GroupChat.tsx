@@ -360,14 +360,14 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     setMessages(prev => [...prev, optimisticMsg]);
     scrollToBottom();
 
-    const payload: Record<string, string> = {
-      user_id: currentUserId,
-      name: currentCheckin.name,
-      profession: currentCheckin.profession,
-      text,
-      avatar_url: currentAvatar,
-      is_flagged: 'false',
-    };
+    const payload: Record<string, any> = {
+  user_id: currentUserId,
+  name: currentCheckin.name,
+  profession: currentCheckin.profession,
+  text,
+  avatar_url: currentAvatar,
+  is_flagged: false, // ← correct boolean
+};
     if (isGroup) payload.vehicle_id = currentCheckin.vehicle_id;
     else payload.destination = currentCheckin.to_location;
 

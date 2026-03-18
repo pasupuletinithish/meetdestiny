@@ -47,7 +47,7 @@ const moderateMessage = async (
         'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model:  'llama-3.1-8b-instant',
+        model: 'llama-3.1-8b-instant',
         messages: [
           {
             role: 'system',
@@ -94,6 +94,7 @@ Rules:
     });
 
     const data = await response.json();
+    console.log('Groq response:', JSON.stringify(data));
     const content = data.choices?.[0]?.message?.content?.trim();
     if (!content) return { allowed: true, shouldWarn: false, shouldBlock: false, aiReply: '' };
 
@@ -145,6 +146,27 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       messagesEndRef.current?.scrollIntoView({ behavior });
     }, 50);
   }, []);
+
+  // ── Helper: save AI message to DB so everyone sees it ────
+  const saveAIMessage = useCallback(async (
+    text: string,
+    checkin: CheckinData
+  ) => {
+    const payload: Record<string, any> = {
+      user_id: 'ai-moderator',
+      name: '🤖 MeetDestiny AI',
+      profession: 'Safety Moderator',
+      text,
+      avatar_url: '',
+      is_flagged: false,
+      is_ai: true,
+    };
+    if (isGroup) payload.vehicle_id = checkin.vehicle_id;
+    else payload.destination = checkin.to_location;
+
+    await supabase.from(tableName).insert(payload);
+    // No need to setMessages — realtime broadcasts to all ✅
+  }, [isGroup, tableName]);
 
   useEffect(() => {
     const init = async () => {
@@ -206,7 +228,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
 
   // ── Realtime with AI moderation on incoming messages ──────
   useEffect(() => {
-    if (!currentCheckin) return; // ← removed !currentUserId check
+    if (!currentCheckin) return;
     const chatId = isGroup ? currentCheckin.vehicle_id : currentCheckin.to_location;
 
     const channel = supabase.channel(`${mode}-chat-${chatId}`)
@@ -214,10 +236,23 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         event: 'INSERT', schema: 'public', table: tableName,
         filter: `${filterField}=eq.${chatId}`,
       }, async (payload) => {
-          console.log('🔥 Realtime fired:', payload);
+        console.log('🔥 Realtime fired:', payload);
         const newMsg = payload.new as Message;
 
-        // ✅ Get user ID directly — don't rely on state
+        // Skip AI messages — just show them
+        if (newMsg.is_ai || newMsg.user_id === 'ai-moderator') {
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+          scrollToBottom();
+          return;
+        }
+
+        // Skip flagged messages
+        if (newMsg.is_flagged) return;
+
+        // Get current user from auth
         const { data: { user } } = await supabase.auth.getUser();
         const userId = user?.id;
 
@@ -235,32 +270,22 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
           return;
         }
 
-        // ── Incoming from OTHERS — run AI moderation ──
+        // ── Incoming from OTHERS — moderate ──
         if (isGroup) {
           console.log('🤖 Moderating incoming:', newMsg.text);
           const moderation = await moderateMessage(newMsg.text, newMsg.name, 0);
 
           if (!moderation.allowed) {
-            // Flag message in DB
+            // Flag the original message in DB
             await supabase.from(tableName)
               .update({ is_flagged: true })
               .eq('id', newMsg.id);
 
-            // Show AI sarcastic reply to everyone
-            const aiMsg: Message = {
-              id: `ai-${Date.now()}`,
-              user_id: 'ai-moderator',
-              name: '🤖 MeetDestiny AI',
-              profession: 'Safety Moderator',
-              text: moderation.aiReply || '⚠️ A message was removed for violating community guidelines.',
-              created_at: new Date().toISOString(),
-              is_ai: true,
-            };
-
-            setMessages(prev => {
-              if (prev.some(m => m.id === newMsg.id)) return prev;
-              return [...prev, aiMsg];
-            });
+            // ✅ Save AI reply to DB — realtime will broadcast to ALL users
+            await saveAIMessage(
+              moderation.aiReply || '⚠️ A message was removed for violating community guidelines.',
+              currentCheckin
+            );
 
             // Warn or ban sender
             if (moderation.shouldBlock) {
@@ -278,22 +303,23 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                   .eq('user_id', newMsg.user_id);
               }
             }
-
-            scrollToBottom();
             return;
           }
         }
 
-        // ── Message passed moderation — show normally ──
+        // ── Message passed — show normally ──
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
         scrollToBottom();
-      }).subscribe();
+      })
+      .subscribe((status) => {
+        console.log('📡 Channel status:', status);
+      });
 
     return () => { supabase.removeChannel(channel); };
-  }, [currentCheckin, mode, isGroup, tableName, filterField, scrollToBottom]); // ← removed currentUserId
+  }, [currentCheckin, mode, isGroup, tableName, filterField, scrollToBottom, saveAIMessage]);
 
   // ── Send with AI moderation (own messages) ────────────────
   const handleSend = async (e: React.FormEvent) => {
@@ -315,19 +341,11 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       if (!moderation.allowed) {
         setSending(false);
 
-        if (moderation.aiReply) {
-          const aiMsg: Message = {
-            id: `ai-${Date.now()}`,
-            user_id: 'ai-moderator',
-            name: '🤖 MeetDestiny AI',
-            profession: 'Safety Moderator',
-            text: moderation.aiReply,
-            created_at: new Date().toISOString(),
-            is_ai: true,
-          };
-          setMessages(prev => [...prev, aiMsg]);
-          scrollToBottom();
-        }
+        // ✅ Save AI reply to DB — realtime broadcasts to everyone
+        await saveAIMessage(
+          moderation.aiReply || '⚠️ Message removed for violating guidelines.',
+          currentCheckin
+        );
 
         if (moderation.shouldWarn) {
           const newWarnCount = warnCount + 1;
@@ -371,6 +389,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       text,
       avatar_url: currentAvatar,
       is_flagged: false,
+      is_ai: false,
     };
     if (isGroup) payload.vehicle_id = currentCheckin.vehicle_id;
     else payload.destination = currentCheckin.to_location;
@@ -539,14 +558,14 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                 <AnimatePresence mode="popLayout">
                   {group.msgs.map((message, index) => {
                     const isOwn = message.user_id === currentUserId;
-                    const isAIMsg = message.is_ai || message.user_id === 'ai-moderator';
+                    const isAIMsg = message.is_ai === true || message.user_id === 'ai-moderator';
                     const time = new Date(message.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
                     const prevMsg = group.msgs[index - 1];
                     const nextMsg = group.msgs[index + 1];
                     const showHeader = !prevMsg || prevMsg.user_id !== message.user_id;
                     const isLastInGroup = !nextMsg || nextMsg.user_id !== message.user_id;
 
-                    // ── AI system message ──
+                    // ── AI system message — centered ──
                     if (isAIMsg) {
                       return (
                         <motion.div key={message.id}

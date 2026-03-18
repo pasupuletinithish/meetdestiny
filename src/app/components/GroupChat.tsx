@@ -11,8 +11,9 @@ interface Message {
   name: string;
   profession: string;
   text: string;
+  avatar_url?: string;
   created_at: string;
-  pending?: boolean; // optimistic flag
+  pending?: boolean;
 }
 
 interface CheckinData {
@@ -21,6 +22,7 @@ interface CheckinData {
   profession: string;
   vehicle_id: string;
   to_location: string;
+  avatar_url?: string;
 }
 
 export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode }) => {
@@ -31,6 +33,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
   const [sending, setSending] = useState(false);
   const [currentCheckin, setCurrentCheckin] = useState<CheckinData | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentAvatar, setCurrentAvatar] = useState('');
   const [memberCount, setMemberCount] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -54,6 +57,15 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
       setCurrentUserId(user.id);
+
+      // Fetch current user's avatar
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('avatar_url')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const avatar = profile?.avatar_url || user.user_metadata?.avatar_url || '';
+      setCurrentAvatar(avatar);
 
       const { data: checkin } = await supabase
         .from('checkins').select('*')
@@ -89,7 +101,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     init();
   }, [navigate, mode, isGroup, tableName, filterField, scrollToBottom]);
 
-  // Realtime — only add messages NOT already in state (avoids duplicates with optimistic)
+  // Realtime
   useEffect(() => {
     if (!currentCheckin) return;
     const chatId = isGroup ? currentCheckin.vehicle_id : currentCheckin.to_location;
@@ -101,12 +113,10 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       }, (payload) => {
         const newMsg = payload.new as Message;
         setMessages(prev => {
-          // If this is a pending optimistic message from us, replace it
           if (pendingIds.current.has(newMsg.id)) {
             pendingIds.current.delete(newMsg.id);
             return prev.map(m => m.id === newMsg.id ? { ...newMsg, pending: false } : m);
           }
-          // Skip if already exists
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
@@ -124,7 +134,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     setMessageText('');
     setSending(true);
 
-    // ── Optimistic update — show message instantly ──
     const tempId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
       id: tempId,
@@ -132,6 +141,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       name: currentCheckin.name,
       profession: currentCheckin.profession,
       text,
+      avatar_url: currentAvatar,
       created_at: new Date().toISOString(),
       pending: true,
     };
@@ -143,6 +153,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       name: currentCheckin.name,
       profession: currentCheckin.profession,
       text,
+      avatar_url: currentAvatar,
     };
     if (isGroup) payload.vehicle_id = currentCheckin.vehicle_id;
     else payload.destination = currentCheckin.to_location;
@@ -150,14 +161,12 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     const { data, error } = await supabase.from(tableName).insert(payload).select().single();
 
     if (error) {
-      // Remove optimistic message on failure
       setMessages(prev => prev.filter(m => m.id !== tempId));
       toast.error('Failed to send message');
       setMessageText(text);
     } else if (data) {
-      // Replace temp message with real one
       setMessages(prev => prev.map(m => m.id === tempId ? { ...data, pending: false } : m));
-      pendingIds.current.add(data.id); // mark so realtime doesn't duplicate
+      pendingIds.current.add(data.id);
     }
 
     setSending(false);
@@ -179,15 +188,43 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     }
   };
 
+  // ── Avatar component — Google photo with initials fallback ──
+  const Avatar = ({ name, avatarUrl, size = 32 }: { name: string; avatarUrl?: string; size?: number }) => {
+    const [imgFailed, setImgFailed] = useState(false);
+    const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
+    if (avatarUrl && !imgFailed) {
+      return (
+        <img
+          src={avatarUrl}
+          alt={name}
+          onError={() => setImgFailed(true)}
+          style={{
+            width: size, height: size, borderRadius: '50%',
+            objectFit: 'cover',
+            border: `1.5px solid ${accentColor}25`,
+            flexShrink: 0,
+          }}
+        />
+      );
+    }
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: '50%',
+        background: `linear-gradient(135deg, ${accentColor}, ${isGroup ? '#E85A2B' : '#5b21b6'})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: `0 2px 8px ${accentGlow}`, flexShrink: 0,
+      }}>
+        <span style={{ fontSize: size * 0.34, fontWeight: 700, color: '#fff' }}>{initials}</span>
+      </div>
+    );
+  };
+
   // Group messages by date
   const groupedMessages = messages.reduce((groups: { date: string; msgs: Message[] }[], msg) => {
     const date = new Date(msg.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     const last = groups[groups.length - 1];
-    if (last && last.date === date) {
-      last.msgs.push(msg);
-    } else {
-      groups.push({ date, msgs: [msg] });
-    }
+    if (last && last.date === date) last.msgs.push(msg);
+    else groups.push({ date, msgs: [msg] });
     return groups;
   }, []);
 
@@ -209,7 +246,8 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       background: 'linear-gradient(160deg, #E3F2FD 0%, #ffffff 45%, #FFE8E0 100%)',
       fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', width: '100%',
     }}>
-      {/* Header */}
+
+      {/* ── Header ── */}
       <div style={{ flexShrink: 0, padding: '14px 16px', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderBottom: `2px solid ${accentColor}20`, boxShadow: `0 2px 12px ${accentGlow}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate('/lounge')}
@@ -237,7 +275,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         </div>
       </div>
 
-      {/* Messages */}
+      {/* ── Messages ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 8px', scrollbarWidth: 'none', display: 'flex', flexDirection: 'column' }}>
         {messages.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
@@ -262,7 +300,6 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                 <AnimatePresence mode="popLayout">
                   {group.msgs.map((message, index) => {
                     const isOwn = message.user_id === currentUserId;
-                    const initials = message.name.split(' ').map((n: string) => n[0]).join('');
                     const time = new Date(message.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
                     const prevMsg = group.msgs[index - 1];
                     const nextMsg = group.msgs[index + 1];
@@ -276,19 +313,19 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                         transition={{ duration: 0.2 }}
                         style={{ display: 'flex', flexDirection: isOwn ? 'row-reverse' : 'row', gap: 8, marginBottom: isLastInGroup ? 10 : 3, alignItems: 'flex-end' }}>
 
-                        {/* Avatar */}
+                        {/* ── Avatar — Google photo or initials fallback ── */}
                         {!isOwn && (
                           <div style={{ flexShrink: 0, width: 32, marginBottom: 2 }}>
-                            {showHeader ? (
-                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: `linear-gradient(135deg, ${accentColor}, ${isGroup ? '#E85A2B' : '#5b21b6'})`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 8px ${accentGlow}` }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{initials}</span>
-                              </div>
-                            ) : <div style={{ width: 32 }} />}
+                            {showHeader
+                              ? <Avatar name={message.name} avatarUrl={message.avatar_url} size={32} />
+                              : <div style={{ width: 32 }} />
+                            }
                           </div>
                         )}
 
                         <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column', alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
-                          {/* Name + profession header */}
+
+                          {/* Name + profession — only for others, only on first in group */}
                           {!isOwn && showHeader && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, paddingLeft: 4 }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{message.name}</span>
@@ -299,19 +336,17 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                           {/* Bubble */}
                           <div style={{
                             padding: '10px 14px',
-                            borderRadius: isOwn
-                              ? `18px 4px 18px 18px`
-                              : `4px 18px 18px 18px`,
+                            borderRadius: isOwn ? '18px 4px 18px 18px' : '4px 18px 18px 18px',
                             background: isOwn
                               ? `linear-gradient(135deg, ${accentColor}, ${isGroup ? '#E85A2B' : '#5b21b6'})`
                               : 'rgba(255,255,255,0.95)',
-                            border: isOwn ? 'none' : `1px solid rgba(148,163,184,0.15)`,
+                            border: isOwn ? 'none' : '1px solid rgba(148,163,184,0.15)',
                             boxShadow: isOwn ? `0 4px 16px ${accentGlow}` : '0 2px 8px rgba(0,0,0,0.06)',
                           }}>
                             <p style={{ fontSize: 14, color: isOwn ? '#fff' : '#0f172a', margin: 0, lineHeight: 1.55, wordBreak: 'break-word' }}>{message.text}</p>
                           </div>
 
-                          {/* Time + status */}
+                          {/* Time + tick */}
                           {isLastInGroup && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>
                               <span style={{ fontSize: 10, color: '#94a3b8' }}>{time}</span>
@@ -342,9 +377,12 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         </motion.div>
       )}
 
-      {/* Input */}
+      {/* ── Input ── */}
       <div style={{ flexShrink: 0, padding: '10px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderTop: `1px solid ${accentColor}12` }}>
         <form onSubmit={handleSend} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Show sender's own Google avatar next to input */}
+          <Avatar name={currentCheckin?.name || ''} avatarUrl={currentAvatar} size={36} />
+
           <input
             ref={inputRef}
             type="text"

@@ -23,13 +23,15 @@ export function AuthCallback() {
 
       if (!existing) {
         // Brand new user — create profile and send to check-in
-        await supabase.from('user_profiles').insert({
-          user_id: user.id,
-          name: user.user_metadata?.full_name || '',
-          profession: '',
-          total_journeys: 0,
-          role: 'user',
-        });
+       // In handlePostLogin, update the insert:
+await supabase.from('user_profiles').insert({
+  user_id: user.id,
+  name: user.user_metadata?.full_name || '',
+  profession: '',
+  total_journeys: 0,
+  role: 'user',
+  avatar_url: user.user_metadata?.avatar_url || '', // ← add this
+});
         navigate('/check-in');
         return;
       }

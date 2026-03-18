@@ -48,9 +48,9 @@ const getAIDuration = async (from: string, to: string): Promise<number> => {
     const data = await response.json();
     const raw = data.choices?.[0]?.message?.content?.trim();
     const minutes = parseInt(raw);
-    return isNaN(minutes) ? 360 : minutes; // fallback to 6hrs if parse fails
+    return isNaN(minutes) ? 360 : minutes;
   } catch {
-    return 360; // fallback to 6hrs
+    return 360;
   }
 };
 
@@ -129,6 +129,18 @@ const findCorridorMatches = async (corridor: string[]): Promise<number> => {
   } catch { return 0; }
 };
 
+// ── Helper: fetch current user's avatar_url ───────────────────
+const getUserAvatar = async (userId: string): Promise<string> => {
+  try {
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('avatar_url')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return data?.avatar_url || '';
+  } catch { return ''; }
+};
+
 // ── Compass Logo ──────────────────────────────────────────────
 function CompassLogo() {
   return (
@@ -183,6 +195,7 @@ export const CheckIn: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [fetchingVehicle, setFetchingVehicle] = useState(false);
   const [userName, setUserName] = useState('');
+  const [userAvatar, setUserAvatar] = useState('');
   const [profession, setProfession] = useState('');
 
   // Train
@@ -208,11 +221,16 @@ export const CheckIn: React.FC = () => {
   const [corridorMatches, setCorridorMatches] = useState<number>(0);
   const [analyzingRoute, setAnalyzingRoute] = useState(false);
 
-  // Auto-fetch name from Google
+  // Auto-fetch name + avatar from Google & user_profiles
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user?.user_metadata?.full_name) setUserName(user.user_metadata.full_name);
+      if (!user) return;
+      if (user.user_metadata?.full_name) setUserName(user.user_metadata.full_name);
+      // Fetch avatar from user_profiles
+      const avatar = await getUserAvatar(user.id);
+      // Fallback to Google metadata avatar if not in DB yet
+      setUserAvatar(avatar || user.user_metadata?.avatar_url || '');
     };
     fetchUser();
   }, []);
@@ -236,7 +254,6 @@ export const CheckIn: React.FC = () => {
       if (data && data.Destination) {
         setPnrData(data);
         toast.success('PNR fetched! Calculating realistic travel time... 🤖');
-        // Auto-trigger AI duration for train route
         setFetchingTrainDuration(true);
         const from = data.BoardingPoint || data.Origin;
         const to = data.Destination;
@@ -267,7 +284,6 @@ export const CheckIn: React.FC = () => {
       if (data) {
         setBusData(data);
         toast.success(`${data.operator} found! Calculating travel time... 🤖`);
-        // Auto-trigger AI duration
         setFetchingBusDuration(true);
         const mins = await getAIDuration(data.from_location, data.to_location);
         setBusAIDuration(mins);
@@ -332,21 +348,25 @@ export const CheckIn: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
-      // Use AI duration for accurate expiry
       const expiresAt = calculateExpiryFromDuration(trainAIDuration);
       const arrivalTime = pnrData.DestinationArrival || '11:59 PM';
+      const avatarUrl = userAvatar || await getUserAvatar(user.id);
       const { error } = await supabase.from('checkins').insert({
-        user_id: user.id, name: userName, profession,
+        user_id: user.id,
+        name: userName,
+        profession,
         vehicle_id: pnrData.TrainNumber || pnr,
         from_location: pnrData.BoardingPoint || pnrData.Origin,
         to_location: pnrData.Destination,
         arrival_time: arrivalTime,
         expires_at: expiresAt,
         is_active: true,
+        avatar_url: avatarUrl,
       });
       if (error) throw error;
       setCurrentUser({
-        name: userName, profession,
+        name: userName,
+        profession,
         vehicleId: pnrData.TrainNumber || pnr,
         from: pnrData.BoardingPoint || pnrData.Origin,
         to: pnrData.Destination,
@@ -372,17 +392,28 @@ export const CheckIn: React.FC = () => {
       if (!user) { navigate('/'); return; }
       const expiresAt = calculateExpiryFromDuration(busAIDuration);
       const arrivalTime = busData?.arrival_time || '11:59 PM';
+      const avatarUrl = userAvatar || await getUserAvatar(user.id);
       const { error } = await supabase.from('checkins').insert({
-        user_id: user.id, name: userName, profession,
+        user_id: user.id,
+        name: userName,
+        profession,
         vehicle_id: vehicleId,
         from_location: fromLocation,
         to_location: toLocation,
         arrival_time: arrivalTime,
         expires_at: expiresAt,
         is_active: true,
+        avatar_url: avatarUrl,
       });
       if (error) throw error;
-      setCurrentUser({ name: userName, profession, vehicleId, from: fromLocation, to: toLocation, arrivalTime });
+      setCurrentUser({
+        name: userName,
+        profession,
+        vehicleId,
+        from: fromLocation,
+        to: toLocation,
+        arrivalTime,
+      });
       toast.success('Checked in! Find your co-travelers 🚌');
       navigate('/discovery');
     } catch { toast.error('Check-in failed.'); }
@@ -398,18 +429,23 @@ export const CheckIn: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
       const expiresAt = calculateExpiryFromDuration(routeAnalysis.estimatedDurationMinutes);
+      const avatarUrl = userAvatar || await getUserAvatar(user.id);
       const { error } = await supabase.from('checkins').insert({
-        user_id: user.id, name: userName, profession,
+        user_id: user.id,
+        name: userName,
+        profession,
         vehicle_id: `ROUTE-${Date.now()}`,
         from_location: routeFrom.trim(),
         to_location: routeTo.trim(),
         arrival_time: routeAnalysis.estimatedTime,
         expires_at: expiresAt,
         is_active: true,
+        avatar_url: avatarUrl,
       });
       if (error) throw error;
       setCurrentUser({
-        name: userName, profession,
+        name: userName,
+        profession,
         vehicleId: `ROUTE-${Date.now()}`,
         from: routeFrom,
         to: routeTo,
@@ -427,7 +463,6 @@ export const CheckIn: React.FC = () => {
     { id: 'route-match' as TabType, label: 'Route Match', icon: Navigation, color: '#22c55e' },
   ];
 
-  // Helper: format minutes to human readable
   const formatDuration = (mins: number) => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
@@ -502,12 +537,21 @@ export const CheckIn: React.FC = () => {
         >
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 shadow-xl border border-white/30">
 
-            {/* Shared user info */}
+            {/* Shared user info — now shows Google avatar */}
             <div className="mb-5 pb-5 border-b border-gray-100">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#534AB7] to-[#D4537E] flex items-center justify-center text-white text-sm font-bold shrink-0">
-                  {userName.charAt(0).toUpperCase() || '?'}
-                </div>
+                {userAvatar ? (
+                  <img
+                    src={userAvatar}
+                    alt={userName}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-[#534AB7]/20 shrink-0"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#534AB7] to-[#D4537E] flex items-center justify-center text-white text-sm font-bold shrink-0">
+                    {userName.charAt(0).toUpperCase() || '?'}
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{userName || 'Loading...'}</p>
                   <p className="text-xs text-gray-400">from your Google account</p>
@@ -561,7 +605,6 @@ export const CheckIn: React.FC = () => {
                         <div><span className="text-gray-400 text-xs block">Scheduled Arrival</span><p className="font-medium text-gray-800">{pnrData.DestinationArrival}</p></div>
                         <div><span className="text-gray-400 text-xs block">Class</span><p className="font-medium text-gray-800">{pnrData.Class}</p></div>
                       </div>
-                      {/* AI Duration badge */}
                       <div className="mt-3 pt-3 border-t border-blue-100">
                         {fetchingTrainDuration ? (
                           <div className="flex items-center gap-2 text-xs text-[#1E88E5]">
@@ -569,13 +612,11 @@ export const CheckIn: React.FC = () => {
                             AI calculating realistic travel time...
                           </div>
                         ) : trainAIDuration ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 bg-blue-100 rounded-lg px-3 py-1.5">
-                              <Clock className="w-3.5 h-3.5 text-[#1E88E5]" />
-                              <span className="text-xs font-semibold text-[#1E88E5]">
-                                🤖 AI estimate: {formatDuration(trainAIDuration)} + 1hr buffer
-                              </span>
-                            </div>
+                          <div className="flex items-center gap-1.5 bg-blue-100 rounded-lg px-3 py-1.5">
+                            <Clock className="w-3.5 h-3.5 text-[#1E88E5]" />
+                            <span className="text-xs font-semibold text-[#1E88E5]">
+                              🤖 AI estimate: {formatDuration(trainAIDuration)} + 1hr buffer
+                            </span>
                           </div>
                         ) : null}
                       </div>
@@ -620,7 +661,6 @@ export const CheckIn: React.FC = () => {
                         <div><span className="text-gray-400 text-xs block">From</span><p className="font-medium text-gray-800">{busData.from_location}</p></div>
                         <div><span className="text-gray-400 text-xs block">To</span><p className="font-medium text-gray-800">{busData.to_location}</p></div>
                       </div>
-                      {/* AI Duration badge */}
                       <div className="mt-3 pt-3 border-t border-orange-100">
                         {fetchingBusDuration ? (
                           <div className="flex items-center gap-2 text-xs text-[#FF6B35]">
@@ -639,7 +679,6 @@ export const CheckIn: React.FC = () => {
                     </motion.div>
                   )}
 
-                  {/* Manual fallback */}
                   {busNotFound && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                       <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3">
@@ -663,7 +702,6 @@ export const CheckIn: React.FC = () => {
                             className="h-12 rounded-xl border-2 border-gray-200 bg-white text-sm" />
                         </div>
                       </div>
-                      {/* AI calculate button for manual entry */}
                       <Button type="button" onClick={fetchManualBusDuration}
                         disabled={fetchingBusDuration || !manualFrom.trim() || !manualTo.trim()}
                         className="w-full h-11 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border-2 border-amber-200 font-medium">
@@ -745,7 +783,6 @@ export const CheckIn: React.FC = () => {
                             <p className="font-medium text-gray-800">{routeAnalysis.highway}</p>
                           </div>
                         </div>
-                        {/* Corridor */}
                         {routeAnalysis.corridor.length > 0 && (
                           <div>
                             <p className="text-xs text-gray-400 mb-2">Route corridor</p>
@@ -765,7 +802,6 @@ export const CheckIn: React.FC = () => {
                         )}
                       </div>
 
-                      {/* Matches */}
                       <div className={`rounded-2xl p-4 text-center border-2 ${corridorMatches > 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
                         {corridorMatches > 0 ? (
                           <>
@@ -791,7 +827,6 @@ export const CheckIn: React.FC = () => {
             </AnimatePresence>
           </div>
 
-          {/* Safe travels note */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
             className="mt-4 bg-white/60 backdrop-blur border border-white/40 rounded-2xl p-4 shadow-sm">
             <p className="text-xs text-gray-500 text-center">

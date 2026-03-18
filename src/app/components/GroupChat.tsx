@@ -558,7 +558,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
                 <AnimatePresence mode="popLayout">
                   {group.msgs.map((message, index) => {
                     const isOwn = message.user_id === currentUserId;
-                    const isAIMsg = message.is_ai === true || message.user_id === 'ai-moderator';
+                    const isAIMsg = message.is_ai === true;
                     const time = new Date(message.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
                     const prevMsg = group.msgs[index - 1];
                     const nextMsg = group.msgs[index + 1];

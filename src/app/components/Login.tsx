@@ -88,7 +88,66 @@ export function Login() {
   );
 }
 
-// ── Intro Animation (unchanged) ──────────────────────────────
+// ── Compass Logo ──────────────────────────────────────────────
+function CompassLogo() {
+  return (
+    <svg width="160" height="160" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="pp1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7F77DD"/>
+          <stop offset="100%" stopColor="#D4537E"/>
+        </linearGradient>
+        <linearGradient id="pp2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#534AB7"/>
+          <stop offset="100%" stopColor="#993556"/>
+        </linearGradient>
+        <linearGradient id="pp3" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor="#993556"/>
+          <stop offset="100%" stopColor="#D4537E"/>
+        </linearGradient>
+        <linearGradient id="pp4" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#AFA9EC"/>
+          <stop offset="100%" stopColor="#ED93B1"/>
+        </linearGradient>
+      </defs>
+      <g transform="translate(200,200)">
+        <circle cx="0" cy="0" r="148" fill="none" stroke="url(#pp1)" strokeWidth="0.5" opacity="0.12"/>
+        <circle cx="0" cy="0" r="132" fill="none" stroke="url(#pp1)" strokeWidth="0.8" opacity="0.18"/>
+        <circle cx="0" cy="0" r="116" fill="none" stroke="url(#pp2)" strokeWidth="1" opacity="0.25"/>
+        <g stroke="url(#pp1)" strokeLinecap="round" opacity="0.5" strokeWidth="1.5">
+          <line x1="0" y1="-116" x2="0" y2="-100"/>
+          <line x1="0" y1="100" x2="0" y2="116"/>
+          <line x1="-116" y1="0" x2="-100" y2="0"/>
+          <line x1="100" y1="0" x2="116" y2="0"/>
+          <line x1="82" y1="-82" x2="71" y2="-71"/>
+          <line x1="-82" y1="-82" x2="-71" y2="-71"/>
+          <line x1="82" y1="82" x2="71" y2="71"/>
+          <line x1="-82" y1="82" x2="-71" y2="71"/>
+        </g>
+        <circle cx="0" cy="0" r="96" fill="none" stroke="url(#pp2)" strokeWidth="1.8" opacity="0.6"/>
+        <text fontFamily="sans-serif" fontSize="15" fontWeight="600" fill="url(#pp3)" x="0" y="-104" textAnchor="middle" dominantBaseline="central">N</text>
+        <text fontFamily="sans-serif" fontSize="11" fill="#9c9a92" x="0" y="112" textAnchor="middle" dominantBaseline="central">S</text>
+        <text fontFamily="sans-serif" fontSize="11" fill="#9c9a92" x="112" y="0" textAnchor="middle" dominantBaseline="central">E</text>
+        <text fontFamily="sans-serif" fontSize="11" fill="#9c9a92" x="-112" y="0" textAnchor="middle" dominantBaseline="central">W</text>
+        <path d="M0 -92 L11 0 L0 16 L-11 0Z" fill="url(#pp3)"/>
+        <path d="M0 92 L6 0 L0 -16 L-6 0Z" fill="url(#pp4)" opacity="0.3"/>
+        <circle cx="0" cy="0" r="40" fill="url(#pp1)" opacity="0.06"/>
+        <circle cx="0" cy="0" r="36" fill="white" stroke="url(#pp2)" strokeWidth="2"/>
+        <circle cx="0" cy="0" r="28" fill="none" stroke="url(#pp1)" strokeWidth="0.5" opacity="0.3"/>
+        <circle cx="-10" cy="-11" r="8" fill="#534AB7"/>
+        <path d="M-20 4 Q-10 14 0 4" fill="#534AB7"/>
+        <circle cx="10" cy="-11" r="8" fill="#D4537E"/>
+        <path d="M0 4 Q10 14 20 4" fill="#D4537E"/>
+        <circle cx="0" cy="-4" r="3.5" fill="white" opacity="0.9"/>
+        <circle cx="0" cy="-96" r="5" fill="url(#pp3)"/>
+        <circle cx="68" cy="-68" r="3.5" fill="url(#pp1)" opacity="0.7"/>
+        <circle cx="96" cy="0" r="3" fill="url(#pp1)" opacity="0.5"/>
+      </g>
+    </svg>
+  );
+}
+
+// ── Intro Animation ───────────────────────────────────────────
 function IntroAnimation() {
   return (
     <motion.div
@@ -194,19 +253,15 @@ function LoginForm({
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
           className="text-center"
-        >{/* Replace the animated square icon with your actual logo */}
-<motion.div
-  initial={{ opacity: 0, scale: 0.8 }}
-  animate={{ opacity: 1, scale: 1 }}
-  transition={{ delay: 0.3, duration: 0.6 }}
-  className="flex justify-center mb-2"
->
-  <img
-    src="/meetdestiny-logo.svg"
-    alt="MeetDestiny"
-    className="w-48 h-auto"
-  />
-</motion.div>
+        >
+          {/* Compass Logo */}
+          <motion.div
+            className="flex justify-center mb-4"
+            animate={{ rotate: [0, 3, -3, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <CompassLogo />
+          </motion.div>
 
           {/* App name */}
           <motion.div
@@ -215,23 +270,23 @@ function LoginForm({
             transition={{ delay: 0.3, duration: 0.6 }}
           >
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Sparkles className="w-5 h-5 text-[#1E88E5]" />
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-[#1E88E5] to-[#FF6B35] bg-clip-text text-transparent">
+              <Sparkles className="w-5 h-5 text-[#534AB7]" />
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-[#534AB7] to-[#D4537E] bg-clip-text text-transparent">
                 MeetDestiny
               </h1>
-              <Sparkles className="w-5 h-5 text-[#FF6B35]" />
+              <Sparkles className="w-5 h-5 text-[#D4537E]" />
             </div>
             <p className="text-gray-500 text-sm tracking-wide">
               Meet someone at every mile
             </p>
           </motion.div>
 
-          {/* 3 feature pills */}
+          {/* Feature pills */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.6 }}
-            className="flex justify-center gap-2 mt-6 flex-wrap"
+            className="flex justify-center gap-2 mt-5 flex-wrap"
           >
             {['🚆 Train', '🚌 Bus', '👥 Connect'].map((tag, i) => (
               <span
@@ -245,7 +300,7 @@ function LoginForm({
         </motion.div>
       </div>
 
-      {/* Bottom card — fixed to bottom like mobile apps */}
+      {/* Bottom card */}
       <motion.div
         initial={{ opacity: 0, y: 100 }}
         animate={{ opacity: 1, y: 0 }}
@@ -254,7 +309,7 @@ function LoginForm({
       >
         <div
           className="bg-white/90 backdrop-blur-xl rounded-3xl px-6 py-8 shadow-2xl border border-white/30 w-full max-w-sm mx-auto md:max-w-md"
-          style={{ boxShadow: '0 -4px 40px rgba(30, 136, 229, 0.12), 0 20px 60px rgba(255, 107, 53, 0.1)' }}
+          style={{ boxShadow: '0 -4px 40px rgba(83, 74, 183, 0.12), 0 20px 60px rgba(212, 83, 126, 0.1)' }}
         >
           <motion.div
             initial={{ opacity: 0 }}
@@ -277,7 +332,7 @@ function LoginForm({
               {loading ? (
                 <span className="flex items-center gap-2">
                   <motion.div
-                    className="w-5 h-5 border-2 border-gray-300 border-t-[#1E88E5] rounded-full"
+                    className="w-5 h-5 border-2 border-gray-300 border-t-[#534AB7] rounded-full"
                     animate={{ rotate: 360 }}
                     transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
                   />
@@ -313,9 +368,9 @@ function LoginForm({
             {/* Terms */}
             <p className="text-xs text-gray-400 text-center leading-relaxed">
               By continuing, you agree to our{' '}
-              <span className="text-[#1E88E5] hover:underline cursor-pointer">Terms</span>
+              <span className="text-[#534AB7] hover:underline cursor-pointer">Terms</span>
               {' & '}
-              <span className="text-[#1E88E5] hover:underline cursor-pointer">Privacy Policy</span>
+              <span className="text-[#534AB7] hover:underline cursor-pointer">Privacy Policy</span>
             </p>
           </motion.div>
         </div>

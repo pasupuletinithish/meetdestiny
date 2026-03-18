@@ -2,72 +2,47 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Mail, Lock, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 
 export function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [showOtp, setShowOtp] = useState(false);
   const [showAnimation, setShowAnimation] = useState(true);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowAnimation(false);
-    }, 5000);
+    const timer = setTimeout(() => setShowAnimation(false), 5000);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleGetOtp = async () => {
-    if (!email.includes('@')) return;
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
+  // Handle redirect back from Google OAuth
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        await handlePostLogin(session.user);
+      }
     });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      setShowOtp(true);
-      toast.success('OTP sent! Check your email.');
-    }
-  };
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
-  const handleLogin = async () => {
-    if (otp.length < 8) return;
-    setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: 'magiclink',
-    });
-    setLoading(false);
-    if (error) {
-      toast.error('Invalid OTP. Please try again.');
-  
-  toast.success('Welcome to Destiny!');
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
+  const handlePostLogin = async (user: any) => {
     const { data: existing } = await supabase
       .from('user_profiles').select('role')
       .eq('user_id', user.id).maybeSingle();
 
     if (!existing) {
       await supabase.from('user_profiles').insert({
-        user_id: user.id, name: '', profession: '',
-        total_journeys: 0, role: 'user',
+        user_id: user.id,
+        name: user.user_metadata?.full_name || '',
+        profession: '',
+        total_journeys: 0,
+        role: 'user',
       });
       navigate('/check-in');
     } else if (existing.role?.toLowerCase() === 'admin') {
       navigate('/admin');
     } else {
-      // Check active journey
       const { data: activeCheckin } = await supabase
         .from('checkins').select('id')
         .eq('user_id', user.id).eq('is_active', true)
@@ -77,23 +52,29 @@ export function Login() {
       if (activeCheckin) {
         navigate('/discovery');
       } else {
-        // Check if has friends (returning user)
         const { count } = await supabase
           .from('friends').select('*', { count: 'exact', head: true })
           .or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`)
           .eq('status', 'accepted');
 
-        if (count && count > 0) {
-          navigate('/discovery'); // Returning user — show Start New Journey
-        } else {
-          navigate('/check-in'); // New user
-        }
+        navigate(count && count > 0 ? '/discovery' : '/check-in');
       }
     }
-  } else {
-    navigate('/check-in');
-  }
-}
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+    }
+    // No need to setLoading(false) on success — page redirects to Google
   };
 
   return (
@@ -102,24 +83,14 @@ export function Login() {
         {showAnimation ? (
           <IntroAnimation key="intro" />
         ) : (
-          <LoginForm
-            key="login"
-            email={email}
-            setEmail={setEmail}
-            otp={otp}
-            setOtp={setOtp}
-            showOtp={showOtp}
-            setShowOtp={setShowOtp}
-            handleGetOtp={handleGetOtp}
-            handleLogin={handleLogin}
-            loading={loading}
-          />
+          <LoginForm key="login" handleGoogleLogin={handleGoogleLogin} loading={loading} />
         )}
       </AnimatePresence>
     </div>
   );
 }
 
+// ── Intro Animation (unchanged) ──────────────────────────────
 function IntroAnimation() {
   return (
     <motion.div
@@ -187,113 +158,73 @@ function IntroAnimation() {
   );
 }
 
+// ── Login Form ────────────────────────────────────────────────
 function LoginForm({
-  email, setEmail, otp, setOtp, showOtp, setShowOtp, handleGetOtp, handleLogin, loading,
+  handleGoogleLogin,
+  loading,
 }: {
-  email: string;
-  setEmail: (value: string) => void;
-  otp: string;
-  setOtp: (value: string) => void;
-  showOtp: boolean;
-  setShowOtp: (value: boolean) => void;
-  handleGetOtp: () => void;
-  handleLogin: () => void;
+  handleGoogleLogin: () => void;
   loading: boolean;
 }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
+      {/* Background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div className="absolute w-64 h-64 rounded-full bg-[#1E88E5]/10 blur-3xl" animate={{ x: [0, 100, 0], y: [0, 50, 0], scale: [1, 1.2, 1] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }} style={{ top: '10%', left: '10%' }} />
         <motion.div className="absolute w-96 h-96 rounded-full bg-[#FF6B35]/10 blur-3xl" animate={{ x: [0, -80, 0], y: [0, 80, 0], scale: [1, 1.3, 1] }} transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }} style={{ bottom: '10%', right: '10%' }} />
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 py-12">
+        {/* Header */}
         <motion.div initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: 'easeOut' }} className="text-center mb-12">
           <motion.div className="inline-flex items-center gap-2 mb-4" initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.3, duration: 0.5, type: 'spring' }}>
             <Sparkles className="w-8 h-8 text-[#1E88E5]" />
             <h1 className="text-5xl font-bold bg-gradient-to-r from-[#1E88E5] to-[#FF6B35] bg-clip-text text-transparent">Destiny</h1>
             <Sparkles className="w-8 h-8 text-[#FF6B35]" />
           </motion.div>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.8 }} className="text-gray-600 text-sm">Connect. Travel. Together.</motion.p>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.8 }} className="text-gray-600 text-sm">Meet someone at every mile</motion.p>
         </motion.div>
 
+        {/* Card */}
         <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.8 }} className="w-full max-w-md">
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20" style={{ boxShadow: '0 20px 60px rgba(30, 136, 229, 0.15), 0 8px 24px rgba(255, 107, 53, 0.1)' }}>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.8 }}>
               <h2 className="text-2xl font-semibold text-center mb-2 bg-gradient-to-r from-[#1E88E5] to-[#FF6B35] bg-clip-text text-transparent">Welcome Traveler</h2>
-              <p className="text-gray-600 text-center text-sm mb-8">Your journey begins here</p>
+              <p className="text-gray-500 text-center text-sm mb-8">Your journey begins here</p>
 
-              <div className="space-y-4">
-                <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.7, duration: 0.5 }}>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#1E88E5]" />
-                    <Input
-                      type="email"
-                      placeholder="Enter your email address"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-12 h-14 rounded-2xl border-2 border-gray-200 focus:border-[#1E88E5] transition-all duration-300"
-                      disabled={showOtp || loading}
-                    />
-                  </div>
-                </motion.div>
-
-                {showOtp && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} transition={{ duration: 0.5 }}>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#FF6B35]" />
-                      <Input
-                        type="text"
-                        placeholder="Enter 8-digit OTP"
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value)}
-                        className="pl-12 h-14 rounded-2xl border-2 border-gray-200 focus:border-[#FF6B35] transition-all duration-300"
-                        maxLength={8}
-                        disabled={loading}
+              {/* Google Sign In Button */}
+              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.7, duration: 0.5 }}>
+                <Button
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full h-14 rounded-2xl bg-white hover:bg-gray-50 text-gray-700 font-medium shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <motion.div
+                        className="w-5 h-5 border-2 border-gray-300 border-t-[#1E88E5] rounded-full"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
                       />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      OTP sent to <span className="font-medium text-[#1E88E5]">{email}</span>
-                    </p>
-                  </motion.div>
-                )}
-
-                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.9, duration: 0.5 }}>
-                  {!showOtp ? (
-                    <Button
-                      onClick={handleGetOtp}
-                      disabled={!email.includes('@') || loading}
-                      className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#1E88E5] to-[#1565C0] hover:from-[#1565C0] hover:to-[#0D47A1] text-white font-medium shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? 'Sending OTP...' : 'Get OTP'}
-                    </Button>
+                      Connecting...
+                    </span>
                   ) : (
-                    <Button
-                      onClick={handleLogin}
-                      disabled={otp.length < 8 || loading}
-                      className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#FF6B35] to-[#E85A2B] hover:from-[#E85A2B] hover:to-[#D94E1F] text-white font-medium shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? 'Verifying...' : 'Login'}
-                    </Button>
+                    <>
+                      {/* Google Icon */}
+                      <svg width="20" height="20" viewBox="0 0 24 24">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                      </svg>
+                      Continue with Google
+                    </>
                   )}
-                </motion.div>
+                </Button>
+              </motion.div>
 
-                {showOtp && (
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3, duration: 0.5 }}
-                    onClick={() => { setShowOtp(false); setOtp(''); }}
-                    className="w-full text-center text-sm text-[#1E88E5] hover:text-[#1565C0] transition-colors duration-200"
-                    disabled={loading}
-                  >
-                    Change email address
-                  </motion.button>
-                )}
-              </div>
-
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1, duration: 0.8 }} className="text-xs text-gray-500 text-center mt-8">
-                By continuing, you agree to Destiny's{' '}
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1, duration: 0.8 }} className="text-xs text-gray-400 text-center mt-6">
+                By continuing, you agree to MeetDestiny's{' '}
                 <span className="text-[#1E88E5] hover:underline cursor-pointer">Terms of Service</span>{' '}
                 and{' '}
                 <span className="text-[#1E88E5] hover:underline cursor-pointer">Privacy Policy</span>
@@ -302,15 +233,16 @@ function LoginForm({
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3, duration: 1 }} className="mt-12 text-center">
-          <p className="text-gray-600 text-sm">Where every journey creates a connection</p>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 1 }} className="mt-12 text-center">
+          <p className="text-gray-500 text-sm">Where every journey creates a connection</p>
         </motion.div>
       </div>
 
+      {/* Floating elements */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {[...Array(6)].map((_, i) => (
           <motion.div key={i} className="absolute w-20 h-20 rounded-2xl"
-            style={{ background: i % 2 === 0 ? 'linear-gradient(135deg, rgba(30, 136, 229, 0.1), rgba(30, 136, 229, 0.05))' : 'linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(255, 107, 53, 0.05))', left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, backdropFilter: 'blur(10px)' }}
+            style={{ background: i % 2 === 0 ? 'linear-gradient(135deg, rgba(30, 136, 229, 0.1), rgba(30, 136, 229, 0.05))' : 'linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(255, 107, 53, 0.05))', left: `${15 + i * 15}%`, top: `${10 + i * 12}%`, backdropFilter: 'blur(10px)' }}
             animate={{ y: [0, -30, 0], rotateX: [0, 360], rotateY: [0, 360], scale: [1, 1.1, 1] }}
             transition={{ duration: 5 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.2 }}
           />

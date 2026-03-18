@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { Login } from './components/Login';
+import { AuthCallback } from './components/AuthCallback';
 import { CheckIn } from './components/CheckIn';
 import { DiscoveryHub } from './components/DiscoveryHub';
 import { Lounge } from './components/Lounge';
@@ -15,6 +16,7 @@ import { AdminPanel } from './components/AdminPanel';
 
 export const router = createBrowserRouter([
   { path: '/', Component: Login },
+  { path: '/auth/callback', Component: AuthCallback },
   { path: '/check-in', Component: CheckIn },
   { path: '/discovery', Component: DiscoveryHub },
   { path: '/lounge', Component: Lounge },

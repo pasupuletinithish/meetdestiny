@@ -153,7 +153,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     checkin: CheckinData
   ) => {
     const payload: Record<string, any> = {
-      user_id: 'ai-moderator',
+      user_id: null,
       name: '🤖 MeetDestiny AI',
       profession: 'Safety Moderator',
       text,
@@ -240,7 +240,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         const newMsg = payload.new as Message;
 
         // Skip AI messages — just show them
-        if (newMsg.is_ai || newMsg.user_id === 'ai-moderator') {
+        if (newMsg.is_ai === true) {
           setMessages(prev => {
             if (prev.some(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];

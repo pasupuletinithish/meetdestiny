@@ -32,12 +32,15 @@ const moderateMessage = async (
   text: string,
   userName: string,
   warnCount: number
-): Promise<{
+)
+: Promise<{
   allowed: boolean;
   shouldWarn: boolean;
   shouldBlock: boolean;
   aiReply: string;
+  
 }> => {
+  console.log('🤖 Moderating:', text);
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',

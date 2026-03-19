@@ -221,9 +221,9 @@ export const AdminPanel: React.FC = () => {
     const { error } = await supabase
       .from('user_profiles')
       .update({ is_banned: true, warn_count: 2 })
-      .eq('user_id', userId);
+      .eq('id', userId);
     if (!error) {
-      setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, is_banned: true } : u));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_banned: true } : u));
       toast.error(`${userName} has been banned.`);
     } else {
       toast.error('Failed to ban user');
@@ -233,25 +233,20 @@ export const AdminPanel: React.FC = () => {
 
   // ── Unban user ────────────────────────────────────────────
   const handleUnban = async (userId: string, userName: string) => {
-  setActionLoading(userId);
-  console.log('Unbanning:', userId);
-  
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .update({ is_banned: false, warn_count: 0 })
-    .eq('user_id', userId)
-    .select(); // ← add select to see what's returned
-    
-  console.log('Unban result:', data, 'Error:', error);
-  
-  if (!error) {
-    setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, is_banned: false, warn_count: 0 } : u));
-    toast.success(`${userName} has been unbanned! ✅`);
-  } else {
-    toast.error('Failed to unban user');
-  }
-  setActionLoading(null);
-};
+    setActionLoading(userId);
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ is_banned: false, warn_count: 0 })
+      .eq('id', userId);
+    if (!error) {
+setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_banned: false, warn_count: 0 } : u));
+      toast.success(`${userName} has been unbanned! ✅`);
+    } else {
+      toast.error('Failed to unban user');
+    }
+    setActionLoading(null);
+  };
+
   // ── Review report ─────────────────────────────────────────
   const handleReviewReport = async (reportId: string, action: 'actioned' | 'dismissed', reportedId?: string, reportedName?: string) => {
     setActionLoading(reportId);
@@ -503,7 +498,7 @@ export const AdminPanel: React.FC = () => {
                       ) : user.is_banned ? (
                         <motion.button
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => handleUnban(user.user_id, user.name)}
+                          onClick={() => handleUnban(user.id, user.name)}
                           className="flex items-center gap-1.5 px-3 py-2 bg-green-500 text-white text-xs font-bold rounded-xl shadow-sm">
                           <ShieldCheck size={14} />
                           Unban
@@ -511,7 +506,7 @@ export const AdminPanel: React.FC = () => {
                       ) : (
                         <motion.button
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => handleBan(user.user_id, user.name)}
+                          onClick={() => handleBan(user.id, user.name)}
                           className="flex items-center gap-1.5 px-3 py-2 bg-red-500 text-white text-xs font-bold rounded-xl shadow-sm">
                           <ShieldAlert size={14} />
                           Ban

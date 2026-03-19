@@ -231,21 +231,33 @@ export const AdminPanel: React.FC = () => {
     setActionLoading(null);
   };
 
-  // ── Unban user ────────────────────────────────────────────
-  const handleUnban = async (userId: string, userName: string) => {
-    setActionLoading(userId);
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ is_banned: false, warn_count: 0 })
-      .eq('id', userId);
-    if (!error) {
-setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_banned: false, warn_count: 0 } : u));
-      toast.success(`${userName} has been unbanned! ✅`);
-    } else {
-      toast.error('Failed to unban user');
-    }
-    setActionLoading(null);
-  };
+const handleUnban = async (userId: string, userName: string) => {
+  setActionLoading(userId);
+  console.log('Unbanning id:', userId);
+  
+  // First check what the current record looks like
+  const { data: current } = await supabase
+    .from('user_profiles')
+    .select('id, user_id, is_banned, warn_count')
+    .eq('id', userId)
+    .maybeSingle();
+  console.log('Current record:', current);
+
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ is_banned: false, warn_count: 0 })
+    .eq('id', userId)
+    .select();
+  console.log('After update:', data, 'Error:', error);
+  
+  if (!error && data?.length > 0) {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_banned: false, warn_count: 0 } : u));
+    toast.success(`${userName} has been unbanned! ✅`);
+  } else {
+    toast.error('Failed to unban user');
+  }
+  setActionLoading(null);
+};
 
   // ── Review report ─────────────────────────────────────────
   const handleReviewReport = async (reportId: string, action: 'actioned' | 'dismissed', reportedId?: string, reportedName?: string) => {

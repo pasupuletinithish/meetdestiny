@@ -55,34 +55,19 @@ const verifyLocationWithAI = async (
         'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192',
+        model: 'llama-3.1-8b-instant',
         messages: [
           {
-            role: 'system',
-            content: 'You are an Indian geography expert. Verify if GPS coordinates are near a travel route. Respond ONLY with raw JSON.',
-          },
-          {
             role: 'user',
-            content: `GPS coordinates: ${lat}, ${lng}
-Travel route: ${from} to ${to} in India
-
-Is this person likely on or near this route?
-Consider: they could be at a bus stand, railway station, or anywhere within 50km of the route corridor.
-
-Respond ONLY with this JSON:
-{
-  "isOnRoute": true/false,
-  "nearestCity": "closest city name",
-  "confidence": "high/medium/low",
-  "reason": "brief reason"
-}`,
+            content: `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}. Route: ${from} to ${to} in India. Is this person near this route? Reply ONLY with JSON: {"isOnRoute": true, "nearestCity": "city name", "confidence": "high"}`,
           },
         ],
         temperature: 0.1,
-        max_tokens: 150,
+        max_tokens: 60,
       }),
     });
     const data = await response.json();
+    console.log('GPS response:', JSON.stringify(data));
     const content = data.choices?.[0]?.message?.content?.trim();
     if (!content) return { isOnRoute: true, nearestCity: 'Unknown', confidence: 'low' };
     const cleaned = content.replace(/```json|```/g, '').trim();

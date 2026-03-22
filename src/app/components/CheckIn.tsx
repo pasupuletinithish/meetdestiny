@@ -27,7 +27,6 @@ interface GPSResult {
   accuracy: number;
 }
 
-// ── Parse time string ─────────────────────────────────────────
 const parseTimeToDate = (timeStr: string, dateStr?: string): Date | null => {
   try {
     let hours = 0, minutes = 0;
@@ -47,7 +46,6 @@ const parseTimeToDate = (timeStr: string, dateStr?: string): Date | null => {
   } catch { return null; }
 };
 
-// ── Departure check ───────────────────────────────────────────
 const checkDepartureTime = (departureTime: Date, arrivalTime?: Date): { canCheckIn: boolean; minutesUntil: number; tooLate: boolean } => {
   const now = new Date();
   const diffMs = departureTime.getTime() - now.getTime();
@@ -56,7 +54,6 @@ const checkDepartureTime = (departureTime: Date, arrivalTime?: Date): { canCheck
   return { canCheckIn: diffMins <= 10 && !pastArrival, minutesUntil: diffMins, tooLate: pastArrival };
 };
 
-// ── Expiry calculators ────────────────────────────────────────
 const calculateExpiryFromArrival = (arrivalTimeStr: string, dateStr?: string, fallbackDurationMinutes?: number): string => {
   const arrDate = parseTimeToDate(arrivalTimeStr, dateStr);
   if (arrDate) {
@@ -72,7 +69,6 @@ const calculateExpiryFromDuration = (durationMinutes: number): string => {
   const now = new Date(); now.setMinutes(now.getMinutes() + durationMinutes + 60); return now.toISOString();
 };
 
-// ── GPS ───────────────────────────────────────────────────────
 const getCurrentLocation = (): Promise<GPSResult | null> => new Promise(resolve => {
   if (!navigator.geolocation) { resolve(null); return; }
   navigator.geolocation.getCurrentPosition(pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }), () => resolve(null), { timeout: 8000, maximumAge: 60000 });
@@ -204,10 +200,7 @@ export const CheckIn: React.FC = () => {
   const [manualOperator, setManualOperator] = useState('');
   const [busAIDuration, setBusAIDuration] = useState<number | null>(null);
   const [fetchingBusDuration, setFetchingBusDuration] = useState(false);
-
-  // ── NEW: Boarding point selection ──
   const [boardingDirection, setBoardingDirection] = useState<'forward' | 'return' | null>(null);
-  // forward = from_location → to_location, return = to_location → from_location
 
   // Route Match
   const [routeFrom, setRouteFrom] = useState('');
@@ -227,7 +220,6 @@ export const CheckIn: React.FC = () => {
     fetchUser();
   }, []);
 
-  // Countdown timer
   useEffect(() => {
     if (!departureCheck || departureCheck.canCheckIn || departureCheck.minutesUntil <= 0) return;
     const interval = setInterval(() => {
@@ -240,28 +232,21 @@ export const CheckIn: React.FC = () => {
     return () => clearInterval(interval);
   }, [departureCheck]);
 
-  // ── Check departure for bus based on direction ──────────────
   const checkBusDeparture = useCallback((bus: any, direction: 'forward' | 'return') => {
-    // Pick the right departure time based on direction
     const depTimeStr = direction === 'forward'
       ? (bus.forward_departure || bus.departure_time)
       : (bus.return_departure || bus.departure_time);
-
     if (!depTimeStr) { setDepartureCheck({ canCheckIn: true, minutesUntil: 0, tooLate: false }); return; }
-
     const depDate = parseTimeToDate(depTimeStr);
     if (!depDate) { setDepartureCheck({ canCheckIn: true, minutesUntil: 0, tooLate: false }); return; }
-
     const arrDate = bus.arrival_time ? parseTimeToDate(bus.arrival_time) : undefined;
     const check = checkDepartureTime(depDate, arrDate || undefined);
     setDepartureCheck(check);
-
     if (check.tooLate) {
       toast.error('❌ This bus has already arrived at destination!');
     } else if (!check.canCheckIn) {
       const minsUntilOpen = check.minutesUntil - 10;
-      const h = Math.floor(minsUntilOpen / 60);
-      const m = minsUntilOpen % 60;
+      const h = Math.floor(minsUntilOpen / 60); const m = minsUntilOpen % 60;
       toast.warning(`⏰ Too early! Check-in opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`}`);
     }
   }, []);
@@ -329,12 +314,10 @@ export const CheckIn: React.FC = () => {
     finally { setFetchingVehicle(false); }
   };
 
-  // ── When user selects boarding direction ──────────────────
   const handleSelectDirection = async (direction: 'forward' | 'return') => {
     setBoardingDirection(direction);
     setBusAIDuration(null);
     checkBusDeparture(busData, direction);
-
     const from = direction === 'forward' ? busData.from_location : busData.to_location;
     const to = direction === 'forward' ? busData.to_location : busData.from_location;
     toast.success(`Got it! Calculating ${from} → ${to} travel time... 🤖`);
@@ -366,18 +349,6 @@ export const CheckIn: React.FC = () => {
       toast.success(matches > 0 ? `🎉 ${matches} traveler${matches > 1 ? 's' : ''} found! Est. ${hrs}h ${mins}m` : `Route analyzed! Est. ${hrs}h ${mins}m — be the first! 🌟`);
     } catch { toast.error('AI analysis failed.'); }
     finally { setAnalyzingRoute(false); }
-  };
-
-  // ── Check if should show waiting game ────────────────────
-  const handleCheckInAttempt = (canCheckIn: boolean, minutesUntil: number, tooLate: boolean, submitFn: () => void) => {
-    if (tooLate) { toast.error('❌ This vehicle has already reached its destination!'); return; }
-    if (!canCheckIn && minutesUntil > 10) {
-      const minsUntilOpen = minutesUntil - 10;
-      setWaitingMinutes(minsUntilOpen);
-      setShowWaitingGame(true);
-      return;
-    }
-    submitFn();
   };
 
   // ── Banners ───────────────────────────────────────────────
@@ -450,19 +421,12 @@ export const CheckIn: React.FC = () => {
   };
 
   const doBusSubmit = async () => {
-    // Determine actual from/to based on direction
-    const fromLocation = boardingDirection === 'return'
-      ? (busData?.to_location || manualFrom)
-      : (busData?.from_location || manualFrom);
-    const toLocation = boardingDirection === 'return'
-      ? (busData?.from_location || manualTo)
-      : (busData?.to_location || manualTo);
+    const fromLocation = boardingDirection === 'return' ? (busData?.to_location || manualFrom) : (busData?.from_location || manualFrom);
+    const toLocation = boardingDirection === 'return' ? (busData?.from_location || manualTo) : (busData?.to_location || manualTo);
     const vehicleId = busData?.vehicle_number || busIdInput.trim() || `MANUAL-${Date.now()}`;
-
     if (!fromLocation || !toLocation) { toast.error('Please enter route details'); return; }
     if (!profession.trim()) { toast.error('Please enter your profession'); return; }
     if (!busAIDuration) { toast.error('Please wait for AI to calculate travel time'); return; }
-
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -505,16 +469,28 @@ export const CheckIn: React.FC = () => {
     if (!pnrData) { toast.error('Please fetch PNR details first'); return; }
     if (!profession.trim()) { toast.error('Please enter your profession'); return; }
     if (!trainAIDuration) { toast.error('Still calculating travel time...'); return; }
-    if (departureCheck) handleCheckInAttempt(departureCheck.canCheckIn, departureCheck.minutesUntil, departureCheck.tooLate, doTrainSubmit);
-    else doTrainSubmit();
+    if (departureCheck && !departureCheck.canCheckIn) {
+      if (departureCheck.tooLate) { toast.error('❌ This vehicle has already reached its destination!'); return; }
+      // Too early — show game
+      setWaitingMinutes(departureCheck.minutesUntil - 10);
+      setShowWaitingGame(true);
+      return;
+    }
+    doTrainSubmit();
   };
 
   const handleBusSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busData && !boardingDirection) { toast.error('Please select your boarding direction first'); return; }
     if (!busAIDuration) { toast.error('Please wait for AI to calculate travel time'); return; }
-    if (busData && departureCheck) handleCheckInAttempt(departureCheck.canCheckIn, departureCheck.minutesUntil, departureCheck.tooLate, doBusSubmit);
-    else doBusSubmit();
+    if (busData && departureCheck && !departureCheck.canCheckIn) {
+      if (departureCheck.tooLate) { toast.error('❌ This vehicle has already reached its destination!'); return; }
+      // Too early — show game
+      setWaitingMinutes(departureCheck.minutesUntil - 10);
+      setShowWaitingGame(true);
+      return;
+    }
+    doBusSubmit();
   };
 
   const handleRouteSubmit = async (e: React.FormEvent) => {
@@ -525,8 +501,8 @@ export const CheckIn: React.FC = () => {
   };
 
   const formatDuration = (mins: number) => { const h = Math.floor(mins / 60); const m = mins % 60; return `${h}h ${m}m`; };
-  const isTrainBlocked = departureCheck !== null && !departureCheck.canCheckIn;
-  const isBusBlocked = busData !== null && boardingDirection !== null && departureCheck !== null && !departureCheck.canCheckIn;
+  const isTrainBlocked = departureCheck !== null && !departureCheck.canCheckIn && !departureCheck.tooLate;
+  const isBusBlocked = busData !== null && boardingDirection !== null && departureCheck !== null && !departureCheck.canCheckIn && !departureCheck.tooLate;
 
   const tabs = [
     { id: 'reserved-train' as TabType, label: 'Train', icon: Train, color: '#1E88E5' },
@@ -534,7 +510,6 @@ export const CheckIn: React.FC = () => {
     { id: 'route-match' as TabType, label: 'Route Match', icon: Navigation, color: '#22c55e' },
   ];
 
-  // ── Show waiting game ─────────────────────────────────────
   if (showWaitingGame) {
     return <WaitingGame minutesUntil={waitingMinutes} onCheckInReady={() => setShowWaitingGame(false)} />;
   }
@@ -629,10 +604,15 @@ export const CheckIn: React.FC = () => {
                   <DepartureBanner />
                   <GPSBanner />
 
-                  <Button type="submit" disabled={loading || !pnrData || !profession.trim() || !trainAIDuration || isTrainBlocked}
+                  {/* ── TRAIN SUBMIT BUTTON — clickable even when blocked ── */}
+                  <Button
+                    type="submit"
+                    disabled={loading || !pnrData || !profession.trim() || !trainAIDuration}
                     className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#1E88E5] to-[#1565C0] text-white font-medium shadow-lg disabled:opacity-50 text-base">
-                    {loading ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span>
-                      : isTrainBlocked ? '🎮 Play while you wait!' : '🚆 Start Networking'}
+                    {loading
+                      ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span>
+                      : isTrainBlocked ? '🎮 Play while you wait!'
+                      : '🚆 Start Networking'}
                   </Button>
                 </motion.form>
               )}
@@ -652,7 +632,7 @@ export const CheckIn: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* ── BOARDING DIRECTION SELECTOR ── */}
+                  {/* Boarding direction selector */}
                   {busData && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                       <div className="bg-orange-50 border-2 border-[#FF6B35]/20 rounded-2xl p-4">
@@ -661,47 +641,30 @@ export const CheckIn: React.FC = () => {
                         </p>
                         <p className="text-xs text-gray-500 mb-3">This bus runs both directions. Select where you're boarding from:</p>
                         <div className="grid grid-cols-1 gap-2">
-                          {/* Forward direction */}
-                          <motion.button type="button" whileTap={{ scale: 0.97 }}
-                            onClick={() => handleSelectDirection('forward')}
+                          <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={() => handleSelectDirection('forward')}
                             style={{ padding: '12px 14px', borderRadius: 12, border: `2px solid ${boardingDirection === 'forward' ? '#FF6B35' : '#e2e8f0'}`, background: boardingDirection === 'forward' ? 'rgba(255,107,53,0.08)' : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span style={{ fontSize: 18 }}>🚌</span>
                               <div>
-                                <p style={{ fontSize: 13, fontWeight: 700, color: boardingDirection === 'forward' ? '#FF6B35' : '#1e293b', margin: 0 }}>
-                                  {busData.from_location} → {busData.to_location}
-                                </p>
-                                {busData.forward_departure && (
-                                  <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>Departs: {busData.forward_departure}</p>
-                                )}
+                                <p style={{ fontSize: 13, fontWeight: 700, color: boardingDirection === 'forward' ? '#FF6B35' : '#1e293b', margin: 0 }}>{busData.from_location} → {busData.to_location}</p>
+                                {busData.forward_departure && <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>Departs: {busData.forward_departure}</p>}
                               </div>
                               {boardingDirection === 'forward' && <span style={{ marginLeft: 'auto', color: '#FF6B35', fontSize: 16 }}>✅</span>}
                             </div>
                           </motion.button>
-
-                          {/* Return direction */}
-                          <motion.button type="button" whileTap={{ scale: 0.97 }}
-                            onClick={() => handleSelectDirection('return')}
+                          <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={() => handleSelectDirection('return')}
                             style={{ padding: '12px 14px', borderRadius: 12, border: `2px solid ${boardingDirection === 'return' ? '#FF6B35' : '#e2e8f0'}`, background: boardingDirection === 'return' ? 'rgba(255,107,53,0.08)' : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span style={{ fontSize: 18 }}>🔄</span>
                               <div>
-                                <p style={{ fontSize: 13, fontWeight: 700, color: boardingDirection === 'return' ? '#FF6B35' : '#1e293b', margin: 0 }}>
-                                  {busData.to_location} → {busData.from_location}
-                                </p>
-                                {busData.return_departure && (
-                                  <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>Departs: {busData.return_departure}</p>
-                                )}
+                                <p style={{ fontSize: 13, fontWeight: 700, color: boardingDirection === 'return' ? '#FF6B35' : '#1e293b', margin: 0 }}>{busData.to_location} → {busData.from_location}</p>
+                                {busData.return_departure && <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>Departs: {busData.return_departure}</p>}
                               </div>
                               {boardingDirection === 'return' && <span style={{ marginLeft: 'auto', color: '#FF6B35', fontSize: 16 }}>✅</span>}
                             </div>
                           </motion.button>
                         </div>
-
-                        {/* AI duration result */}
-                        {fetchingBusDuration && (
-                          <div className="flex items-center gap-2 text-xs text-[#FF6B35] mt-3"><Loader2 className="w-3.5 h-3.5 animate-spin" /> AI calculating travel time...</div>
-                        )}
+                        {fetchingBusDuration && <div className="flex items-center gap-2 text-xs text-[#FF6B35] mt-3"><Loader2 className="w-3.5 h-3.5 animate-spin" /> AI calculating travel time...</div>}
                         {busAIDuration && !fetchingBusDuration && (
                           <div className="flex items-center gap-1.5 bg-orange-100 rounded-lg px-3 py-1.5 mt-3">
                             <Clock className="w-3.5 h-3.5 text-[#FF6B35]" />
@@ -741,10 +704,15 @@ export const CheckIn: React.FC = () => {
                   <DepartureBanner />
                   <GPSBanner />
 
-                  <Button type="submit" disabled={loading || (!busData && !busNotFound) || !busAIDuration || isBusBlocked}
+                  {/* ── BUS SUBMIT BUTTON — clickable even when blocked ── */}
+                  <Button
+                    type="submit"
+                    disabled={loading || (!busData && !busNotFound) || !busAIDuration}
                     className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#FF6B35] to-[#E85A2B] text-white font-medium shadow-lg disabled:opacity-50 text-base">
-                    {loading ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span>
-                      : isBusBlocked ? '🎮 Play while you wait!' : '🚌 Start Networking'}
+                    {loading
+                      ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span>
+                      : isBusBlocked ? '🎮 Play while you wait!'
+                      : '🚌 Start Networking'}
                   </Button>
                 </motion.form>
               )}

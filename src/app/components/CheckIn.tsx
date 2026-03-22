@@ -29,26 +29,21 @@ interface GPSResult {
 // ── Parse time string like "06:00 AM" or "18:30" to today's Date ──
 const parseTimeToDate = (timeStr: string, dateStr?: string): Date | null => {
   try {
-    const now = new Date();
     let hours = 0, minutes = 0;
 
     if (timeStr.includes('AM') || timeStr.includes('PM')) {
-      // Format: "06:00 AM" or "6:00 PM"
       const [time, period] = timeStr.trim().split(' ');
       const [h, m] = time.split(':').map(Number);
       hours = period === 'PM' && h !== 12 ? h + 12 : period === 'AM' && h === 12 ? 0 : h;
       minutes = m;
     } else {
-      // Format: "18:30"
       const [h, m] = timeStr.split(':').map(Number);
       hours = h;
       minutes = m;
     }
 
-    // Use journey date if provided (for trains)
     let base = new Date();
     if (dateStr) {
-      // PNR date format: "18-Mar-2026" or "18/03/2026"
       const parsed = new Date(dateStr.replace(/-/g, ' '));
       if (!isNaN(parsed.getTime())) base = parsed;
     }
@@ -58,8 +53,16 @@ const parseTimeToDate = (timeStr: string, dateStr?: string): Date | null => {
   } catch { return null; }
 };
 
-// ── Check if can check in (within 10 mins before departure) ──
-const checkDepartureTime = (departureTime: Date): {
+// ── Check if can check in ─────────────────────────────────────
+// Logic:
+// - Before 10 mins before departure → TOO EARLY ❌
+// - Within 10 mins before departure → CAN CHECK IN ✅
+// - After departure, before arrival → CAN CHECK IN ✅ (on the journey!)
+// - After arrival → TOO LATE ❌
+const checkDepartureTime = (
+  departureTime: Date,
+  arrivalTime?: Date
+): {
   canCheckIn: boolean;
   minutesUntil: number;
   tooLate: boolean;
@@ -68,23 +71,24 @@ const checkDepartureTime = (departureTime: Date): {
   const diffMs = departureTime.getTime() - now.getTime();
   const diffMins = Math.floor(diffMs / 60000);
 
+  // Check if past arrival time
+  const pastArrival = arrivalTime ? now > arrivalTime : false;
+
   return {
-    canCheckIn: diffMins <= 10 && diffMins >= -60, // 10 min before to 60 min after
+    canCheckIn: diffMins <= 10 && !pastArrival,
     minutesUntil: diffMins,
-    tooLate: diffMins < -60,
+    tooLate: pastArrival,
   };
 };
 
-// ── Auto create group room in lounge_messages ─────────────────
-const createGroupRoom = async (vehicleId: string, expiresAt: string) => {
-  // Check if room already exists
+// ── Auto create group room ────────────────────────────────────
+const createGroupRoom = async (vehicleId: string) => {
   const { count } = await supabase
     .from('lounge_messages')
     .select('*', { count: 'exact', head: true })
     .eq('vehicle_id', vehicleId);
 
   if (count === 0) {
-    // Create welcome message to initialize room
     await supabase.from('lounge_messages').insert({
       user_id: null,
       name: '🚌 MeetDestiny',
@@ -276,14 +280,18 @@ export const CheckIn: React.FC = () => {
     fetchUser();
   }, []);
 
-  // ── Countdown timer for departure ─────────────────────────
+  // ── Live countdown timer ──────────────────────────────────
   useEffect(() => {
-    if (!departureCheck || departureCheck.canCheckIn) return;
-    if (departureCheck.minutesUntil <= 0) return;
+    if (!departureCheck || departureCheck.canCheckIn || departureCheck.minutesUntil <= 0) return;
 
     const interval = setInterval(() => {
-      const h = Math.floor(departureCheck.minutesUntil / 60);
-      const m = departureCheck.minutesUntil % 60;
+      const totalMins = departureCheck.minutesUntil - 10; // mins until check-in opens
+      if (totalMins <= 0) {
+        setCountdown('now');
+        return;
+      }
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
       setCountdown(h > 0 ? `${h}h ${m}m` : `${m}m`);
     }, 1000);
 
@@ -292,17 +300,29 @@ export const CheckIn: React.FC = () => {
 
   // ── Check departure time for bus ──────────────────────────
   const checkBusDeparture = useCallback((bus: any) => {
-    if (!bus?.departure_time) return;
+    if (!bus?.departure_time) {
+      // No departure time → allow check-in
+      setDepartureCheck({ canCheckIn: true, minutesUntil: 0, tooLate: false });
+      return;
+    }
     const depDate = parseTimeToDate(bus.departure_time);
-    if (!depDate) return;
-    const check = checkDepartureTime(depDate);
+    if (!depDate) {
+      setDepartureCheck({ canCheckIn: true, minutesUntil: 0, tooLate: false });
+      return;
+    }
+
+    // Parse arrival time to know when journey ends
+    const arrDate = bus.arrival_time ? parseTimeToDate(bus.arrival_time) : undefined;
+
+    const check = checkDepartureTime(depDate, arrDate || undefined);
     setDepartureCheck(check);
 
     if (check.tooLate) {
-      toast.error('❌ This bus has already departed!');
+      toast.error('❌ This bus has already arrived at destination!');
     } else if (!check.canCheckIn) {
-      const h = Math.floor(check.minutesUntil / 60);
-      const m = check.minutesUntil % 60;
+      const minsUntilOpen = check.minutesUntil - 10;
+      const h = Math.floor(minsUntilOpen / 60);
+      const m = minsUntilOpen % 60;
       toast.warning(`⏰ Too early! Check-in opens 10 mins before departure. Opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`}`);
     }
   }, []);
@@ -320,14 +340,21 @@ export const CheckIn: React.FC = () => {
       setDepartureCheck({ canCheckIn: true, minutesUntil: 0, tooLate: false });
       return;
     }
-    const check = checkDepartureTime(depDate);
+
+    // Parse destination arrival time
+    const arrDate = data.DestinationArrival
+      ? parseTimeToDate(data.DestinationArrival, data.DateOfJourney)
+      : undefined;
+
+    const check = checkDepartureTime(depDate, arrDate || undefined);
     setDepartureCheck(check);
 
     if (check.tooLate) {
-      toast.error('❌ This train has already departed!');
+      toast.error('❌ This train has already arrived at destination!');
     } else if (!check.canCheckIn) {
-      const h = Math.floor(check.minutesUntil / 60);
-      const m = check.minutesUntil % 60;
+      const minsUntilOpen = check.minutesUntil - 10;
+      const h = Math.floor(minsUntilOpen / 60);
+      const m = minsUntilOpen % 60;
       toast.warning(`⏰ Check-in opens 10 mins before departure. Opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`}`);
     }
   }, []);
@@ -368,7 +395,7 @@ export const CheckIn: React.FC = () => {
       const data = await response.json();
       if (data && data.Destination) {
         setPnrData(data);
-        checkTrainDeparture(data); // ← Check departure time
+        checkTrainDeparture(data);
         toast.success('PNR fetched! Calculating realistic travel time... 🤖');
         setFetchingTrainDuration(true);
         const from = data.BoardingPoint || data.Origin;
@@ -397,7 +424,7 @@ export const CheckIn: React.FC = () => {
       const { data } = await supabase.from('vehicles').select('*').ilike('vehicle_number', busIdInput.trim()).maybeSingle();
       if (data) {
         setBusData(data);
-        checkBusDeparture(data); // ← Check departure time
+        checkBusDeparture(data);
         toast.success(`${data.operator} found! Calculating travel time... 🤖`);
         setFetchingBusDuration(true);
         const mins = await getAIDuration(data.from_location, data.to_location);
@@ -444,34 +471,47 @@ export const CheckIn: React.FC = () => {
     finally { setAnalyzingRoute(false); }
   };
 
-  // ── Departure time banner ─────────────────────────────────
+  // ── Departure Banner ──────────────────────────────────────
   const DepartureBanner = () => {
     if (!departureCheck) return null;
+
     if (departureCheck.canCheckIn) {
       return (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
           <ShieldCheck className="w-3.5 h-3.5 text-green-600 shrink-0" />
-          <span className="text-xs font-medium text-green-700">✅ Check-in window open — board your vehicle!</span>
+          <span className="text-xs font-medium text-green-700">
+            {departureCheck.minutesUntil < 0
+              ? '✅ Journey in progress — check in anytime!'
+              : '✅ Check-in window open — board your vehicle!'}
+          </span>
         </motion.div>
       );
     }
+
     if (departureCheck.tooLate) {
       return (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
           <ShieldAlert className="w-3.5 h-3.5 text-red-600 shrink-0" />
-          <span className="text-xs font-medium text-red-700">❌ This vehicle has already departed!</span>
+          <span className="text-xs font-medium text-red-700">❌ This vehicle has already reached its destination!</span>
         </motion.div>
       );
     }
+
+    // Too early — show countdown
+    const minsUntilOpen = departureCheck.minutesUntil - 10;
+    const h = Math.floor(minsUntilOpen / 60);
+    const m = minsUntilOpen % 60;
+    const timeStr = countdown || (h > 0 ? `${h}h ${m}m` : `${m}m`);
+
     return (
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
         <Timer className="w-3.5 h-3.5 text-amber-600 shrink-0" />
         <div>
           <span className="text-xs font-medium text-amber-700">⏰ Check-in opens 10 mins before departure</span>
-          <span className="text-xs text-amber-600 ml-1">— opens in {countdown || `${Math.floor(departureCheck.minutesUntil / 60)}h ${departureCheck.minutesUntil % 60}m`}</span>
+          <span className="text-xs text-amber-600 ml-1">— opens in {timeStr}</span>
         </div>
       </motion.div>
     );
@@ -503,8 +543,14 @@ export const CheckIn: React.FC = () => {
 
     // Departure time check
     if (departureCheck && !departureCheck.canCheckIn) {
-      if (departureCheck.tooLate) { toast.error('❌ This train has already departed!'); return; }
-      toast.error(`⏰ Too early! Check-in opens 10 mins before departure.`);
+      if (departureCheck.tooLate) {
+        toast.error('❌ This train has already reached its destination!');
+        return;
+      }
+      const minsUntilOpen = departureCheck.minutesUntil - 10;
+      const h = Math.floor(minsUntilOpen / 60);
+      const m = minsUntilOpen % 60;
+      toast.error(`⏰ Too early! Check-in opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`}`);
       return;
     }
 
@@ -530,8 +576,7 @@ export const CheckIn: React.FC = () => {
       });
       if (error) throw error;
 
-      // ← Auto create group room
-      await createGroupRoom(vehicleId, expiresAt);
+      await createGroupRoom(vehicleId);
 
       setCurrentUser({ name: userName, profession, vehicleId, from, to, arrivalTime });
       toast.success('Checked in! Find your co-travelers 🚆');
@@ -549,10 +594,16 @@ export const CheckIn: React.FC = () => {
     if (!profession.trim()) { toast.error('Please enter your profession'); return; }
     if (!busAIDuration) { toast.error('Please wait for AI to calculate travel time'); return; }
 
-    // Departure time check — only for registered buses
+    // Departure time check — only for registered buses with known departure time
     if (busData && departureCheck && !departureCheck.canCheckIn) {
-      if (departureCheck.tooLate) { toast.error('❌ This bus has already departed!'); return; }
-      toast.error(`⏰ Too early! Check-in opens 10 mins before departure.`);
+      if (departureCheck.tooLate) {
+        toast.error('❌ This bus has already reached its destination!');
+        return;
+      }
+      const minsUntilOpen = departureCheck.minutesUntil - 10;
+      const h = Math.floor(minsUntilOpen / 60);
+      const m = minsUntilOpen % 60;
+      toast.error(`⏰ Too early! Check-in opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`}`);
       return;
     }
 
@@ -575,8 +626,7 @@ export const CheckIn: React.FC = () => {
       });
       if (error) throw error;
 
-      // ← Auto create group room
-      await createGroupRoom(vehicleId, expiresAt);
+      await createGroupRoom(vehicleId);
 
       setCurrentUser({ name: userName, profession, vehicleId, from: fromLocation, to: toLocation, arrivalTime });
       toast.success('Checked in! Find your co-travelers 🚌');
@@ -608,7 +658,6 @@ export const CheckIn: React.FC = () => {
       });
       if (error) throw error;
 
-      // Route match — no group room needed (no shared vehicle ID)
       setCurrentUser({ name: userName, profession, vehicleId, from: routeFrom, to: routeTo, arrivalTime: routeAnalysis.estimatedTime });
       toast.success('Checked in! Finding route matches 🗺️');
       navigate('/discovery');
@@ -624,7 +673,6 @@ export const CheckIn: React.FC = () => {
 
   const formatDuration = (mins: number) => { const h = Math.floor(mins / 60); const m = mins % 60; return `${h}h ${m}m`; };
 
-  // Is submit disabled due to departure time?
   const isTrainBlocked = departureCheck !== null && !departureCheck.canCheckIn;
   const isBusBlocked = busData !== null && departureCheck !== null && !departureCheck.canCheckIn;
 
@@ -833,7 +881,9 @@ export const CheckIn: React.FC = () => {
                       <Button type="button" onClick={fetchManualBusDuration}
                         disabled={fetchingBusDuration || !manualFrom.trim() || !manualTo.trim()}
                         className="w-full h-11 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border-2 border-amber-200 font-medium">
-                        {fetchingBusDuration ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> AI calculating...</span> : '🤖 Calculate Travel Time with AI'}
+                        {fetchingBusDuration
+                          ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> AI calculating...</span>
+                          : '🤖 Calculate Travel Time with AI'}
                       </Button>
                       {busAIDuration && (
                         <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
@@ -883,7 +933,9 @@ export const CheckIn: React.FC = () => {
                   <Button type="button" onClick={handleAnalyzeRoute}
                     disabled={analyzingRoute || !routeFrom.trim() || !routeTo.trim()}
                     className="w-full h-12 rounded-xl bg-green-50 hover:bg-green-100 text-[#22c55e] border-2 border-green-200 font-medium disabled:opacity-50">
-                    {analyzingRoute ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> AI analyzing route...</span> : '🤖 Analyze Route with AI'}
+                    {analyzingRoute
+                      ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> AI analyzing route...</span>
+                      : '🤖 Analyze Route with AI'}
                   </Button>
                   {routeAnalysis && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
@@ -932,7 +984,9 @@ export const CheckIn: React.FC = () => {
                   <GPSBanner />
                   <Button type="submit" disabled={loading || !routeAnalysis || !profession.trim()}
                     className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-white font-medium shadow-lg disabled:opacity-50 text-base">
-                    {loading ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span> : '🗺️ Start Networking'}
+                    {loading
+                      ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span>
+                      : '🗺️ Start Networking'}
                   </Button>
                 </motion.form>
               )}

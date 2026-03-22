@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp, type VibeStatus } from '../context/AppContext';
 import { Switch } from './ui/switch';
-import { MessageCircle, User as UserIcon, EyeOff, Eye, Loader2, Zap, Radio, Users, MapPin, Shield } from 'lucide-react';
+import { MessageCircle, User as UserIcon, EyeOff, Eye, Loader2, Zap, Radio, Users, MapPin, Shield, Flag, Ban, X } from 'lucide-react';
 import { MutualMatchModal } from './MutualMatchModal';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -22,6 +22,15 @@ const vibeLabels: Record<VibeStatus, string> = {
 };
 
 const professionFilters = ['All', 'Software', 'Student', 'UPSC', 'HR'];
+
+const REPORT_REASONS = [
+  'Inappropriate behavior',
+  'Harassment or abuse',
+  'Fake profile',
+  'Spam',
+  'Making me uncomfortable',
+  'Other',
+];
 
 interface CheckinUser {
   id: string;
@@ -50,6 +59,12 @@ export const DiscoveryHub: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<CheckinUser | null>(null);
   const [pingedUsers, setPingedUsers] = useState<Set<string>>(new Set());
   const [hasActiveJourney, setHasActiveJourney] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+
+  // Report modal state
+  const [reportTarget, setReportTarget] = useState<CheckinUser | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -77,6 +92,15 @@ export const DiscoveryHub: React.FC = () => {
     return data || [];
   }, []);
 
+  const fetchBlockedUsers = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from('blocked_users').select('blocked_id')
+      .eq('blocker_id', user.id);
+    if (data) setBlockedUsers(new Set(data.map(b => b.blocked_id)));
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -96,44 +120,27 @@ export const DiscoveryHub: React.FC = () => {
       if (!user) return;
       const users = await fetchNearbyUsers(checkin.vehicle_id, user.id);
       setNearbyUsers(users);
+      await fetchBlockedUsers();
       setLoading(false);
     };
     init();
-  }, [fetchCurrentCheckin, fetchNearbyUsers]);
+  }, [fetchCurrentCheckin, fetchNearbyUsers, fetchBlockedUsers]);
 
-  // ── Journey expired — cleanup everything ──────────────────
   const handleJourneyExpired = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate('/'); return; }
 
-    // ── Delete entire group room for this vehicle ──
     if (currentCheckin?.vehicle_id) {
-      await supabase.from('lounge_messages')
-        .delete()
-        .eq('vehicle_id', currentCheckin.vehicle_id);
+      await supabase.from('lounge_messages').delete().eq('vehicle_id', currentCheckin.vehicle_id);
     }
-
-    // ── Delete destination chat ──
     if (currentCheckin?.to_location) {
-      await supabase.from('destination_messages')
-        .delete()
-        .eq('destination', currentCheckin.to_location);
+      await supabase.from('destination_messages').delete().eq('destination', currentCheckin.to_location);
     }
-
-    // ── Delete private messages both ways ──
-    await supabase.from('private_messages')
-      .delete()
-      .or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`);
-
-    // ── Deactivate ALL checkins for this vehicle ──
+    await supabase.from('private_messages').delete().or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`);
     if (currentCheckin?.vehicle_id) {
-      await supabase.from('checkins')
-        .update({ is_active: false })
-        .eq('vehicle_id', currentCheckin.vehicle_id)
-        .eq('is_active', true);
+      await supabase.from('checkins').update({ is_active: false }).eq('vehicle_id', currentCheckin.vehicle_id).eq('is_active', true);
     }
 
-    // ── Check if user has any friends ──
     const { count } = await supabase
       .from('friends').select('*', { count: 'exact', head: true })
       .or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`)
@@ -156,34 +163,30 @@ export const DiscoveryHub: React.FC = () => {
     }
   }, [currentCheckin, navigate]);
 
-  // ── Timer countdown ───────────────────────────────────────
   useEffect(() => {
-  if (timeRemaining <= 0) return;
-  const timer = setInterval(() => {
-    setTimeRemaining(prev => {
-      if (prev <= 1) { handleJourneyExpired(); return 0; }
-      return prev - 1;
-    });
-  }, 1000);
-  return () => clearInterval(timer);
-}, [timeRemaining, handleJourneyExpired]);
-  // ── Realtime — new travelers joining ─────────────────────
+    if (timeRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) { handleJourneyExpired(); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeRemaining, handleJourneyExpired]);
+
   useEffect(() => {
     if (!currentCheckin) return;
     const channel = supabase.channel('checkins-rt')
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'checkins',
-        filter: `vehicle_id=eq.${currentCheckin.vehicle_id}`
-      }, async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const users = await fetchNearbyUsers(currentCheckin.vehicle_id, user.id);
-        setNearbyUsers(users);
-      }).subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins', filter: `vehicle_id=eq.${currentCheckin.vehicle_id}` },
+        async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const users = await fetchNearbyUsers(currentCheckin.vehicle_id, user.id);
+          setNearbyUsers(users);
+        }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [currentCheckin, fetchNearbyUsers]);
 
-  // ── Realtime — pings ──────────────────────────────────────
   useEffect(() => {
     if (!currentCheckin) return;
     const channel = supabase.channel('pings-rt')
@@ -204,7 +207,6 @@ export const DiscoveryHub: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [currentCheckin, nearbyUsers]);
 
-  // ── Invisible mode ────────────────────────────────────────
   useEffect(() => {
     if (!currentCheckin) return;
     supabase.from('checkins').update({ is_active: !invisibleMode }).eq('id', currentCheckin.id);
@@ -227,9 +229,56 @@ export const DiscoveryHub: React.FC = () => {
     setPingLoading(null);
   };
 
-  const filteredUsers = professionFilter === 'All'
+  // ── Report user ───────────────────────────────────────────
+  const handleReport = async () => {
+    if (!reportTarget || !reportReason) { toast.error('Please select a reason'); return; }
+    setReportLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: user.id,
+      reported_id: reportTarget.user_id,
+      reason: reportReason,
+      context: `Discovery Hub — Vehicle: ${currentCheckin?.vehicle_id}`,
+      status: 'pending',
+    });
+
+    if (!error) {
+      toast.success(`${reportTarget.name} reported. Our team will review. 🛡️`);
+      setReportTarget(null);
+      setReportReason('');
+    } else {
+      toast.error('Failed to submit report');
+    }
+    setReportLoading(false);
+  };
+
+  // ── Block user ────────────────────────────────────────────
+  const handleBlock = async (targetUser: CheckinUser) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from('blocked_users').insert({
+      blocker_id: user.id,
+      blocked_id: targetUser.user_id,
+    });
+
+    if (!error) {
+      setBlockedUsers(prev => new Set([...prev, targetUser.user_id]));
+      // Remove from nearby users list
+      setNearbyUsers(prev => prev.filter(u => u.user_id !== targetUser.user_id));
+      setSelectedUser(null);
+      toast.success(`${targetUser.name} blocked. They won't appear in your journey.`);
+    } else {
+      toast.error('Failed to block user');
+    }
+  };
+
+  const filteredUsers = (professionFilter === 'All'
     ? nearbyUsers
-    : nearbyUsers.filter(u => u.profession.toLowerCase().includes(professionFilter.toLowerCase()));
+    : nearbyUsers.filter(u => u.profession.toLowerCase().includes(professionFilter.toLowerCase()))
+  ).filter(u => !blockedUsers.has(u.user_id)); // ← filter blocked users
 
   const totalDuration = currentCheckin
     ? (new Date(currentCheckin.expires_at).getTime() - new Date(currentCheckin.arrival_time).getTime()) / 1000
@@ -261,6 +310,60 @@ export const DiscoveryHub: React.FC = () => {
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', background: 'linear-gradient(160deg, #E3F2FD 0%, #ffffff 45%, #FFE8E0 100%)', fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', width: '100%' }}>
 
+      {/* ── REPORT MODAL ── */}
+      <AnimatePresence>
+        {reportTarget && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+            onClick={() => setReportTarget(null)}>
+            <motion.div
+              initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }}
+              transition={{ type: 'spring', damping: 25 }}
+              onClick={e => e.stopPropagation()}
+              style={{ width: '100%', maxWidth: 480, background: '#fff', borderRadius: '24px 24px 0 0', padding: '24px 20px 40px', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Flag style={{ width: 16, height: 16, color: '#ef4444' }} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 }}>Report {reportTarget.name}</p>
+                    <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>This will be reviewed by our team</p>
+                  </div>
+                </div>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setReportTarget(null)}
+                  style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(148,163,184,0.1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X style={{ width: 14, height: 14, color: '#64748b' }} />
+                </motion.button>
+              </div>
+
+              {/* Reason selection */}
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Select reason</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                {REPORT_REASONS.map(reason => (
+                  <motion.button key={reason} whileTap={{ scale: 0.98 }}
+                    onClick={() => setReportReason(reason)}
+                    style={{ padding: '12px 16px', borderRadius: 12, border: reportReason === reason ? '2px solid #ef4444' : '1.5px solid rgba(148,163,184,0.2)', background: reportReason === reason ? 'rgba(239,68,68,0.06)' : 'rgba(248,250,252,1)', cursor: 'pointer', textAlign: 'left', fontSize: 14, color: reportReason === reason ? '#dc2626' : '#374151', fontWeight: reportReason === reason ? 600 : 400, transition: 'all 0.15s' }}>
+                    {reason}
+                  </motion.button>
+                ))}
+              </div>
+
+              <motion.button whileTap={{ scale: 0.97 }}
+                onClick={handleReport}
+                disabled={!reportReason || reportLoading}
+                style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', cursor: reportReason ? 'pointer' : 'default', background: reportReason ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(148,163,184,0.15)', color: reportReason ? '#fff' : '#94a3b8', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {reportLoading ? <Loader2 style={{ width: 18, height: 18 }} className="animate-spin" /> : <Flag style={{ width: 16, height: 16 }} />}
+                {reportLoading ? 'Submitting...' : 'Submit Report'}
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Ambient blobs */}
       <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
         <motion.div style={{ position: 'absolute', width: 300, height: 300, top: '-10%', left: '-20%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,136,229,0.1) 0%, transparent 70%)' }}
@@ -287,7 +390,6 @@ export const DiscoveryHub: React.FC = () => {
           </p>
         </div>
 
-        {/* Timer */}
         {hasActiveJourney && (
           <div style={{ position: 'relative', width: 58, height: 58, flexShrink: 0 }}>
             <svg width="58" height="58" style={{ transform: 'rotate(-90deg)', position: 'absolute', inset: 0 }}>
@@ -325,7 +427,6 @@ export const DiscoveryHub: React.FC = () => {
       {/* ── SCROLLABLE CONTENT ── */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 16px 8px', scrollbarWidth: 'none', position: 'relative', zIndex: 10 }}>
 
-        {/* ── NO ACTIVE JOURNEY ── */}
         {!hasActiveJourney ? (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '0 24px' }}>
             <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }}
@@ -351,7 +452,6 @@ export const DiscoveryHub: React.FC = () => {
           </div>
 
         ) : filteredUsers.length === 0 ? (
-          // ── ACTIVE JOURNEY — NO CO-TRAVELERS ──
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '0 24px' }}>
             <div style={{ position: 'relative', width: 96, height: 96, marginBottom: 20 }}>
               {[0, 1, 2].map(i => (
@@ -375,7 +475,6 @@ export const DiscoveryHub: React.FC = () => {
           </div>
 
         ) : (
-          // ── ACTIVE JOURNEY — TRAVELERS FOUND ──
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
               {[
@@ -436,6 +535,7 @@ export const DiscoveryHub: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* ── Expanded action panel ── */}
                     <AnimatePresence>
                       {isSelected && (
                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
@@ -449,7 +549,20 @@ export const DiscoveryHub: React.FC = () => {
                             <motion.button whileTap={{ scale: 0.96 }}
                               onClick={e => { e.stopPropagation(); navigate('/lounge'); }}
                               style={{ flex: 1, padding: '9px', borderRadius: 10, fontSize: 12, fontWeight: 600, color: '#E85A2B', background: 'rgba(255,107,53,0.08)', border: '1px solid rgba(255,107,53,0.18)', cursor: 'pointer' }}>
-                              Message in Lounge
+                              Message
+                            </motion.button>
+                          </div>
+                          {/* ── Report + Block row ── */}
+                          <div style={{ display: 'flex', gap: 8, padding: '0 14px 10px' }}>
+                            <motion.button whileTap={{ scale: 0.96 }}
+                              onClick={e => { e.stopPropagation(); setReportTarget(user); setReportReason(''); }}
+                              style={{ flex: 1, padding: '8px', borderRadius: 10, fontSize: 12, fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                              <Flag style={{ width: 12, height: 12 }} /> Report
+                            </motion.button>
+                            <motion.button whileTap={{ scale: 0.96 }}
+                              onClick={e => { e.stopPropagation(); handleBlock(user); }}
+                              style={{ flex: 1, padding: '8px', borderRadius: 10, fontSize: 12, fontWeight: 600, color: '#64748b', background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                              <Ban style={{ width: 12, height: 12 }} /> Block
                             </motion.button>
                           </div>
                         </motion.div>
@@ -483,10 +596,7 @@ export const DiscoveryHub: React.FC = () => {
       {hasActiveJourney && (
         <div style={{ position: 'relative', zIndex: 20, flexShrink: 0, padding: '10px 16px', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(30,136,229,0.08)', display: 'flex', gap: 10, alignItems: 'stretch' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, background: 'rgba(255,255,255,0.9)', border: '1.5px solid rgba(30,136,229,0.12)', borderRadius: 12, padding: '8px 12px' }}>
-            {invisibleMode
-              ? <EyeOff style={{ width: 15, height: 15, color: '#94a3b8', flexShrink: 0 }} />
-              : <Eye style={{ width: 15, height: 15, color: '#1E88E5', flexShrink: 0 }} />
-            }
+            {invisibleMode ? <EyeOff style={{ width: 15, height: 15, color: '#94a3b8', flexShrink: 0 }} /> : <Eye style={{ width: 15, height: 15, color: '#1E88E5', flexShrink: 0 }} />}
             <span style={{ fontSize: 13, fontWeight: 600, color: '#475569', flex: 1 }}>Invisible</span>
             <Switch checked={invisibleMode} onCheckedChange={setInvisibleMode} />
           </div>

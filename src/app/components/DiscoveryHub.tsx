@@ -83,7 +83,6 @@ export const DiscoveryHub: React.FC = () => {
       const checkin = await fetchCurrentCheckin();
 
       if (!checkin) {
-        // No active journey — show returning user state (don't redirect)
         setHasActiveJourney(false);
         setLoading(false);
         return;
@@ -102,14 +101,39 @@ export const DiscoveryHub: React.FC = () => {
     init();
   }, [fetchCurrentCheckin, fetchNearbyUsers]);
 
+  // ── Journey expired — cleanup everything ──────────────────
   const handleJourneyExpired = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate('/'); return; }
 
-    if (currentCheckin) {
-      await supabase.from('checkins').update({ is_active: false }).eq('id', currentCheckin.id);
+    // ── Delete entire group room for this vehicle ──
+    if (currentCheckin?.vehicle_id) {
+      await supabase.from('lounge_messages')
+        .delete()
+        .eq('vehicle_id', currentCheckin.vehicle_id);
     }
 
+    // ── Delete destination chat ──
+    if (currentCheckin?.to_location) {
+      await supabase.from('destination_messages')
+        .delete()
+        .eq('destination', currentCheckin.to_location);
+    }
+
+    // ── Delete private messages both ways ──
+    await supabase.from('private_messages')
+      .delete()
+      .or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`);
+
+    // ── Deactivate ALL checkins for this vehicle ──
+    if (currentCheckin?.vehicle_id) {
+      await supabase.from('checkins')
+        .update({ is_active: false })
+        .eq('vehicle_id', currentCheckin.vehicle_id)
+        .eq('is_active', true);
+    }
+
+    // ── Check if user has any friends ──
     const { count } = await supabase
       .from('friends').select('*', { count: 'exact', head: true })
       .or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`)
@@ -119,8 +143,6 @@ export const DiscoveryHub: React.FC = () => {
       toast.info('Journey ended. No connections made — account deleted.', { duration: 5000 });
       await supabase.from('checkins').delete().eq('user_id', user.id);
       await supabase.from('pings').delete().eq('from_user_id', user.id);
-      await supabase.from('lounge_messages').delete().eq('user_id', user.id);
-      await supabase.from('private_messages').delete().eq('from_user_id', user.id);
       await supabase.from('muted_chats').delete().eq('user_id', user.id);
       await supabase.from('user_profiles').delete().eq('user_id', user.id);
       await supabase.auth.signOut();
@@ -134,6 +156,7 @@ export const DiscoveryHub: React.FC = () => {
     }
   }, [currentCheckin, navigate]);
 
+  // ── Timer countdown ───────────────────────────────────────
   useEffect(() => {
     if (timeRemaining <= 0) return;
     const timer = setInterval(() => {
@@ -145,19 +168,23 @@ export const DiscoveryHub: React.FC = () => {
     return () => clearInterval(timer);
   }, [timeRemaining, handleJourneyExpired]);
 
+  // ── Realtime — new travelers joining ─────────────────────
   useEffect(() => {
     if (!currentCheckin) return;
     const channel = supabase.channel('checkins-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins', filter: `vehicle_id=eq.${currentCheckin.vehicle_id}` },
-        async () => {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
-          const users = await fetchNearbyUsers(currentCheckin.vehicle_id, user.id);
-          setNearbyUsers(users);
-        }).subscribe();
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'checkins',
+        filter: `vehicle_id=eq.${currentCheckin.vehicle_id}`
+      }, async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const users = await fetchNearbyUsers(currentCheckin.vehicle_id, user.id);
+        setNearbyUsers(users);
+      }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [currentCheckin, fetchNearbyUsers]);
 
+  // ── Realtime — pings ──────────────────────────────────────
   useEffect(() => {
     if (!currentCheckin) return;
     const channel = supabase.channel('pings-rt')
@@ -178,6 +205,7 @@ export const DiscoveryHub: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [currentCheckin, nearbyUsers]);
 
+  // ── Invisible mode ────────────────────────────────────────
   useEffect(() => {
     if (!currentCheckin) return;
     supabase.from('checkins').update({ is_active: !invisibleMode }).eq('id', currentCheckin.id);
@@ -236,8 +264,10 @@ export const DiscoveryHub: React.FC = () => {
 
       {/* Ambient blobs */}
       <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-        <motion.div style={{ position: 'absolute', width: 300, height: 300, top: '-10%', left: '-20%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,136,229,0.1) 0%, transparent 70%)' }} animate={{ scale: [1, 1.2, 1], x: [0, 20, 0] }} transition={{ duration: 8, repeat: Infinity }} />
-        <motion.div style={{ position: 'absolute', width: 280, height: 280, bottom: '-8%', right: '-15%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,107,53,0.1) 0%, transparent 70%)' }} animate={{ scale: [1, 1.3, 1], x: [0, -15, 0] }} transition={{ duration: 10, repeat: Infinity }} />
+        <motion.div style={{ position: 'absolute', width: 300, height: 300, top: '-10%', left: '-20%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,136,229,0.1) 0%, transparent 70%)' }}
+          animate={{ scale: [1, 1.2, 1], x: [0, 20, 0] }} transition={{ duration: 8, repeat: Infinity }} />
+        <motion.div style={{ position: 'absolute', width: 280, height: 280, bottom: '-8%', right: '-15%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,107,53,0.1) 0%, transparent 70%)' }}
+          animate={{ scale: [1, 1.3, 1], x: [0, -15, 0] }} transition={{ duration: 10, repeat: Infinity }} />
       </div>
 
       {/* ── TOP BAR ── */}
@@ -258,7 +288,7 @@ export const DiscoveryHub: React.FC = () => {
           </p>
         </div>
 
-        {/* Timer — only show when active journey */}
+        {/* Timer */}
         {hasActiveJourney && (
           <div style={{ position: 'relative', width: 58, height: 58, flexShrink: 0 }}>
             <svg width="58" height="58" style={{ transform: 'rotate(-90deg)', position: 'absolute', inset: 0 }}>
@@ -274,14 +304,14 @@ export const DiscoveryHub: React.FC = () => {
                 strokeDashoffset={2 * Math.PI * 23 * (1 - progress)} />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#1E88E5', lineHeight: 1 }}>{String(hours).padStart(2,'0')}:{String(mins).padStart(2,'0')}</span>
-              <span style={{ fontSize: 8, color: '#94a3b8', marginTop: 1 }}>{String(secs).padStart(2,'0')}s</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#1E88E5', lineHeight: 1 }}>{String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}</span>
+              <span style={{ fontSize: 8, color: '#94a3b8', marginTop: 1 }}>{String(secs).padStart(2, '0')}s</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Filter pills — only show when active journey */}
+      {/* Filter pills */}
       {hasActiveJourney && (
         <div style={{ position: 'relative', zIndex: 20, display: 'flex', gap: 8, padding: '0 20px 10px', overflowX: 'auto', scrollbarWidth: 'none', flexShrink: 0 }}>
           {professionFilters.map(f => (
@@ -296,31 +326,25 @@ export const DiscoveryHub: React.FC = () => {
       {/* ── SCROLLABLE CONTENT ── */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 16px 8px', scrollbarWidth: 'none', position: 'relative', zIndex: 10 }}>
 
-        {/* ── NO ACTIVE JOURNEY — RETURNING USER ── */}
+        {/* ── NO ACTIVE JOURNEY ── */}
         {!hasActiveJourney ? (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '0 24px' }}>
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }}
+            <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }}
               style={{ width: 88, height: 88, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(30,136,229,0.1), rgba(255,107,53,0.1))', border: '2px solid rgba(30,136,229,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
               <span style={{ fontSize: 36 }}>👋</span>
             </motion.div>
-            <h3 style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', margin: '0 0 8px' }}>
-              Welcome back!
-            </h3>
+            <h3 style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', margin: '0 0 8px' }}>Welcome back!</h3>
             <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 28px', lineHeight: 1.6 }}>
               You don't have an active journey right now.<br />Ready to meet new travelers?
             </p>
-
             <motion.button whileTap={{ scale: 0.96 }} onClick={() => navigate('/check-in')}
               style={{ width: '100%', maxWidth: 280, padding: '15px 32px', borderRadius: 16, fontSize: 15, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #1E88E5, #1565C0)', border: 'none', cursor: 'pointer', boxShadow: '0 8px 24px rgba(30,136,229,0.3)', marginBottom: 12 }}>
               🚀 Start New Journey
             </motion.button>
-
             <motion.button whileTap={{ scale: 0.96 }} onClick={() => navigate('/friends')}
               style={{ width: '100%', maxWidth: 280, padding: '12px 24px', borderRadius: 14, fontSize: 13, fontWeight: 600, color: '#1E88E5', background: 'rgba(30,136,229,0.07)', border: '1.5px solid rgba(30,136,229,0.2)', cursor: 'pointer', marginBottom: 10 }}>
               👥 View My Friends
             </motion.button>
-
             <motion.button whileTap={{ scale: 0.96 }} onClick={() => navigate('/profile')}
               style={{ width: '100%', maxWidth: 280, padding: '12px 24px', borderRadius: 14, fontSize: 13, fontWeight: 600, color: '#FF6B35', background: 'rgba(255,107,53,0.07)', border: '1.5px solid rgba(255,107,53,0.2)', cursor: 'pointer' }}>
               👤 My Profile
@@ -440,7 +464,7 @@ export const DiscoveryHub: React.FC = () => {
         )}
       </div>
 
-      {/* Nearby Stops + Safety SOS — only show when active journey */}
+      {/* Nearby Stops + Safety SOS */}
       {hasActiveJourney && (
         <div style={{ display: 'flex', gap: 10, padding: '0 16px 8px', flexShrink: 0, position: 'relative', zIndex: 20 }}>
           <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate('/nearby-stops')}
@@ -456,7 +480,7 @@ export const DiscoveryHub: React.FC = () => {
         </div>
       )}
 
-      {/* ── BOTTOM ACTION ROW — only when active journey ── */}
+      {/* ── BOTTOM ACTION ROW ── */}
       {hasActiveJourney && (
         <div style={{ position: 'relative', zIndex: 20, flexShrink: 0, padding: '10px 16px', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(30,136,229,0.08)', display: 'flex', gap: 10, alignItems: 'stretch' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, background: 'rgba(255,255,255,0.9)', border: '1.5px solid rgba(30,136,229,0.12)', borderRadius: 12, padding: '8px 12px' }}>

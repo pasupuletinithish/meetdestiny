@@ -175,9 +175,32 @@ const analyzeRouteWithAI = async (from: string, to: string): Promise<RouteAnalys
   } catch { return null; }
 };
 
-const calculateExpiryFromDuration = (durationMinutes: number): string => {
+// ── Calculate expiry from actual arrival time ─────────────────
+const calculateExpiryFromArrival = (
+  arrivalTimeStr: string,
+  dateStr?: string,
+  fallbackDurationMinutes?: number
+): string => {
+  // Try to parse actual arrival time
+  const arrDate = parseTimeToDate(arrivalTimeStr, dateStr);
+
+  if (arrDate) {
+    const now = new Date();
+    // If arrival is in the past (shouldn't happen but just in case)
+    if (arrDate < now) {
+      // Fallback to duration from now
+      const fallback = new Date();
+      fallback.setMinutes(fallback.getMinutes() + (fallbackDurationMinutes || 360) + 60);
+      return fallback.toISOString();
+    }
+    // Add 1hr buffer after arrival
+    arrDate.setMinutes(arrDate.getMinutes() + 60);
+    return arrDate.toISOString();
+  }
+
+  // Fallback to AI duration if can't parse arrival time
   const now = new Date();
-  now.setMinutes(now.getMinutes() + durationMinutes + 60);
+  now.setMinutes(now.getMinutes() + (fallbackDurationMinutes || 360) + 60);
   return now.toISOString();
 };
 
@@ -563,7 +586,11 @@ export const CheckIn: React.FC = () => {
       const gpsOk = await verifyGPS(from, to);
       if (!gpsOk) toast.warning('⚠️ You seem far from this route. Checking in anyway!');
       await supabase.from('user_profiles').update({ is_banned: false, warn_count: 0 }).eq('user_id', user.id);
-      const expiresAt = calculateExpiryFromDuration(trainAIDuration);
+      const expiresAt = calculateExpiryFromArrival(
+  pnrData.DestinationArrival || '',
+  pnrData.DateOfJourney,
+  trainAIDuration
+);
       const arrivalTime = pnrData.DestinationArrival || '11:59 PM';
       const avatarUrl = userAvatar || await getUserAvatar(user.id);
       const vehicleId = pnrData.TrainNumber || pnr;
@@ -614,7 +641,11 @@ export const CheckIn: React.FC = () => {
       const gpsOk = await verifyGPS(fromLocation, toLocation);
       if (!gpsOk) toast.warning('⚠️ You seem far from this route. Checking in anyway!');
       await supabase.from('user_profiles').update({ is_banned: false, warn_count: 0 }).eq('user_id', user.id);
-      const expiresAt = calculateExpiryFromDuration(busAIDuration);
+      const expiresAt = calculateExpiryFromArrival(
+  busData?.arrival_time || '',
+  undefined,
+  busAIDuration
+);
       const arrivalTime = busData?.arrival_time || '11:59 PM';
       const avatarUrl = userAvatar || await getUserAvatar(user.id);
 
@@ -646,7 +677,8 @@ export const CheckIn: React.FC = () => {
       const gpsOk = await verifyGPS(routeFrom, routeTo);
       if (!gpsOk) toast.warning('⚠️ You seem far from this route. Checking in anyway!');
       await supabase.from('user_profiles').update({ is_banned: false, warn_count: 0 }).eq('user_id', user.id);
-      const expiresAt = calculateExpiryFromDuration(routeAnalysis.estimatedDurationMinutes);
+      // Keep as is:
+const expiresAt = calculateExpiryFromDuration(routeAnalysis.estimatedDurationMinutes);
       const avatarUrl = userAvatar || await getUserAvatar(user.id);
       const vehicleId = `ROUTE-${Date.now()}`;
 
@@ -1004,3 +1036,7 @@ export const CheckIn: React.FC = () => {
     </div>
   );
 };
+
+function calculateExpiryFromDuration(estimatedDurationMinutes: number) {
+  throw new Error('Function not implemented.');
+}

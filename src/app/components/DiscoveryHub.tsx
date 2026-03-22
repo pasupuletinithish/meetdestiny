@@ -158,16 +158,15 @@ export const DiscoveryHub: React.FC = () => {
 
   // ── Timer countdown ───────────────────────────────────────
   useEffect(() => {
-    if (timeRemaining <= 0) return;
-    const timer = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) { handleJourneyExpired(); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [timeRemaining, handleJourneyExpired]);
-
+  if (timeRemaining <= 0) return;
+  const timer = setInterval(() => {
+    setTimeRemaining(prev => {
+      if (prev <= 1) { handleJourneyExpired(); return 0; }
+      return prev - 1;
+    });
+  }, 1000);
+  return () => clearInterval(timer);
+}, [timeRemaining, handleJourneyExpired]);
   // ── Realtime — new travelers joining ─────────────────────
   useEffect(() => {
     if (!currentCheckin) return;

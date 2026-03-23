@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bus, Search, LogOut, Loader2, Download, ShieldAlert, ShieldCheck, Users, Flag, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Bus, Search, LogOut, Loader2, Download, ShieldAlert, ShieldCheck, Users, Flag, CheckCircle, XCircle, Clock, Trophy, Plus, Ticket, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 
@@ -44,6 +44,26 @@ interface Report {
   created_at: string;
   reporter?: { name: string };
   reported?: { name: string };
+}
+
+interface Coupon {
+  id: string;
+  code: string;
+  is_used: boolean;
+  used_at?: string;
+  created_at: string;
+}
+
+interface ContestWinner {
+  id: string;
+  winner_name: string;
+  winner_email: string;
+  vehicle_id: string;
+  contest_type: string;
+  score: number;
+  email_sent: boolean;
+  journey_date: string;
+  created_at: string;
 }
 
 function generateRoutePrefix(from: string, to: string): string {
@@ -123,7 +143,6 @@ async function downloadFlyer(vehicle: Vehicle) {
 
   if (qrImg.complete) ctx.drawImage(qrImg, 350, 650, 500, 500);
 
-  // Departure times
   if (vehicle.forward_departure || vehicle.return_departure) {
     ctx.fillStyle = '#f8fafc';
     ctx.beginPath();
@@ -177,14 +196,22 @@ export const AdminPanel: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [winners, setWinners] = useState<ContestWinner[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [userSearch, setUserSearch] = useState('');
-  const [activeView, setActiveView] = useState<'list' | 'add' | 'users' | 'reports'>('list');
+  const [activeView, setActiveView] = useState<'list' | 'add' | 'users' | 'reports' | 'contests'>('list');
   const [previewIds, setPreviewIds] = useState<string[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [editForwardDep, setEditForwardDep] = useState('');
   const [editReturnDep, setEditReturnDep] = useState('');
+
+  // Contest state
+  const [couponInput, setCouponInput] = useState('');
+  const [savingCoupons, setSavingCoupons] = useState(false);
+  const [triggeringWinner, setTriggeringWinner] = useState<string | null>(null);
+  const [contestVehicleId, setContestVehicleId] = useState('');
 
   const [form, setForm] = useState({
     operator: '',
@@ -198,9 +225,7 @@ export const AdminPanel: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
-      await fetchVehicles();
-      await fetchUsers();
-      await fetchReports();
+      await Promise.all([fetchVehicles(), fetchUsers(), fetchReports(), fetchCoupons(), fetchWinners()]);
       setLoading(false);
     };
     init();
@@ -226,6 +251,16 @@ export const AdminPanel: React.FC = () => {
       }));
       setReports(enriched);
     }
+  };
+
+  const fetchCoupons = async () => {
+    const { data } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
+    setCoupons(data || []);
+  };
+
+  const fetchWinners = async () => {
+    const { data } = await supabase.from('contest_winners').select('*').order('created_at', { ascending: false }).limit(50);
+    setWinners(data || []);
   };
 
   const handleBan = async (userId: string, userName: string) => {
@@ -255,7 +290,6 @@ export const AdminPanel: React.FC = () => {
 
   const handlePreview = () => {
     if (!form.operator || !form.from_location || !form.to_location) { toast.error('Missing route details'); return; }
-    // Find next available number for this route
     const prefix = generateRoutePrefix(form.from_location, form.to_location);
     const existing = vehicles.filter(v => v.vehicle_number?.startsWith(prefix));
     const maxNum = existing.reduce((max, v) => {
@@ -275,7 +309,6 @@ export const AdminPanel: React.FC = () => {
       operator: form.operator,
       from_location: form.from_location,
       to_location: form.to_location,
-      // Store as text for display, actual time columns
       departure_time: form.forward_departure || '00:00',
       arrival_time: '23:59',
       forward_departure: form.forward_departure || null,
@@ -292,7 +325,6 @@ export const AdminPanel: React.FC = () => {
     setSaving(false);
   };
 
-  // Save departure times to existing vehicle
   const handleSaveDepartureTimes = async (vehicleId: string) => {
     const { error } = await supabase.from('vehicles').update({
       forward_departure: editForwardDep || null,
@@ -303,6 +335,62 @@ export const AdminPanel: React.FC = () => {
     else toast.error('Failed to save');
   };
 
+  // ── Upload coupons ────────────────────────────────────────
+  const handleUploadCoupons = async () => {
+    const codes = couponInput
+      .split(/[\n,]/)
+      .map(c => c.trim().toUpperCase())
+      .filter(c => c.length > 0);
+
+    if (codes.length === 0) { toast.error('Please enter at least one coupon code'); return; }
+
+    setSavingCoupons(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const rows = codes.map(code => ({ code, is_used: false, uploaded_by: user?.id }));
+      const { error } = await supabase.from('coupons').insert(rows);
+      if (error) throw error;
+      toast.success(`${codes.length} coupon${codes.length > 1 ? 's' : ''} uploaded! 🎟️`);
+      setCouponInput('');
+      await fetchCoupons();
+    } catch (err: any) {
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setSavingCoupons(false);
+    }
+  };
+
+  // ── Delete coupon ─────────────────────────────────────────
+  const handleDeleteCoupon = async (couponId: string) => {
+    const { error } = await supabase.from('coupons').delete().eq('id', couponId);
+    if (!error) { setCoupons(prev => prev.filter(c => c.id !== couponId)); toast.success('Coupon removed'); }
+    else toast.error('Failed to delete');
+  };
+
+  // ── Manually trigger winner pick ──────────────────────────
+  const handleTriggerWinner = async () => {
+    if (!contestVehicleId.trim()) { toast.error('Enter a vehicle ID first'); return; }
+    setTriggeringWinner(contestVehicleId);
+    try {
+      const { data, error } = await supabase.functions.invoke('pick-winner', {
+        body: { vehicle_id: contestVehicleId.trim() }
+      });
+      if (error) throw error;
+      if (data?.winner) {
+        toast.success(`🏆 Winner: ${data.winner.name} — ${data.contest}`);
+        await fetchWinners();
+        await fetchCoupons();
+        setContestVehicleId('');
+      } else {
+        toast.info(data?.message || 'No winner picked');
+      }
+    } catch (err: any) {
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setTriggeringWinner(null);
+    }
+  };
+
   const filteredUsers = users.filter(u =>
     u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
     u.profession?.toLowerCase().includes(userSearch.toLowerCase())
@@ -311,12 +399,27 @@ export const AdminPanel: React.FC = () => {
   const pendingReports = reports.filter(r => r.status === 'pending');
   const bannedCount = users.filter(u => u.is_banned).length;
   const warnedCount = users.filter(u => u.warn_count > 0 && !u.is_banned).length;
+  const availableCoupons = coupons.filter(c => !c.is_used).length;
+  const usedCoupons = coupons.filter(c => c.is_used).length;
+
   const filteredVehicles = vehicles.filter(v =>
     v.vehicle_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     v.operator?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     v.from_location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     v.to_location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const CONTEST_SCHEDULE = [
+    { day: 'Monday', name: 'Social Butterfly 🦋', desc: 'Most pings sent' },
+    { day: 'Tuesday', name: 'Best Connector 🤝', desc: 'Most mutual matches' },
+    { day: 'Wednesday', name: 'Lounge Star 💬', desc: 'Most messages' },
+    { day: 'Thursday', name: 'Early Bird 🐦', desc: 'First to check in' },
+    { day: 'Friday', name: 'Friend Magnet 👥', desc: 'Most friends added' },
+    { day: 'Saturday', name: 'Lucky Draw 🎰', desc: 'Random winner' },
+    { day: 'Sunday', name: 'All Rounder 🏆', desc: 'Combined score' },
+  ];
+  const todayContest = CONTEST_SCHEDULE[new Date().getDay()];
 
   if (loading) return (
     <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -328,26 +431,28 @@ export const AdminPanel: React.FC = () => {
     <div className="max-w-lg mx-auto h-screen flex flex-col bg-slate-50 font-sans shadow-2xl">
 
       {/* ── Header ── */}
-      <div className="bg-blue-600 p-6 text-white">
-        <div className="flex justify-between items-center mb-4">
+      <div className="bg-blue-600 p-4 text-white">
+        <div className="flex justify-between items-center mb-3">
           <h1 className="text-xl font-black italic">DESTINY ADMIN</h1>
           <button onClick={() => navigate('/')} className="p-2 bg-white/10 rounded-lg"><LogOut size={18} /></button>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="bg-white/10 rounded-xl p-2 text-center"><p className="text-lg font-black">{users.length}</p><p className="text-xs opacity-70">Users</p></div>
-          <div className="bg-white/10 rounded-xl p-2 text-center"><p className="text-lg font-black text-red-300">{bannedCount}</p><p className="text-xs opacity-70">Banned</p></div>
-          <div className="bg-white/10 rounded-xl p-2 text-center"><p className="text-lg font-black text-yellow-300">{pendingReports.length}</p><p className="text-xs opacity-70">Reports</p></div>
+        <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="bg-white/10 rounded-xl p-2 text-center"><p className="text-base font-black">{users.length}</p><p className="text-[10px] opacity-70">Users</p></div>
+          <div className="bg-white/10 rounded-xl p-2 text-center"><p className="text-base font-black text-red-300">{bannedCount}</p><p className="text-[10px] opacity-70">Banned</p></div>
+          <div className="bg-white/10 rounded-xl p-2 text-center"><p className="text-base font-black text-yellow-300">{pendingReports.length}</p><p className="text-[10px] opacity-70">Reports</p></div>
+          <div className="bg-white/10 rounded-xl p-2 text-center"><p className="text-base font-black text-green-300">{availableCoupons}</p><p className="text-[10px] opacity-70">Coupons</p></div>
         </div>
 
-        {/* Tabs */}
-        <div className="grid grid-cols-4 gap-1">
+        {/* Tabs — 5 tabs now */}
+        <div className="grid grid-cols-5 gap-1">
           {[
             { id: 'list', label: 'BUSES' },
             { id: 'add', label: 'ADD' },
             { id: 'users', label: 'USERS' },
-            { id: 'reports', label: `REPORTS${pendingReports.length > 0 ? ` (${pendingReports.length})` : ''}` },
+            { id: 'reports', label: `RPT${pendingReports.length > 0 ? `(${pendingReports.length})` : ''}` },
+            { id: 'contests', label: '🏆' },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveView(tab.id as any)}
               className={`py-2 rounded-xl text-xs font-bold transition-all ${activeView === tab.id ? 'bg-white text-blue-600' : 'bg-white/10 text-white'}`}>
@@ -385,19 +490,18 @@ export const AdminPanel: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Departure times display */}
                   {(v.forward_departure || v.return_departure) ? (
                     <div className="flex gap-2 mb-2">
                       {v.forward_departure && (
                         <div className="flex items-center gap-1.5 bg-blue-50 rounded-lg px-2 py-1">
                           <span className="text-xs">→</span>
-                          <span className="text-xs font-bold text-blue-600">{v.from_location?.slice(0,3)}: {v.forward_departure}</span>
+                          <span className="text-xs font-bold text-blue-600">{v.from_location?.slice(0, 3)}: {v.forward_departure}</span>
                         </div>
                       )}
                       {v.return_departure && (
                         <div className="flex items-center gap-1.5 bg-orange-50 rounded-lg px-2 py-1">
                           <span className="text-xs">←</span>
-                          <span className="text-xs font-bold text-orange-600">{v.to_location?.slice(0,3)}: {v.return_departure}</span>
+                          <span className="text-xs font-bold text-orange-600">{v.to_location?.slice(0, 3)}: {v.return_departure}</span>
                         </div>
                       )}
                     </div>
@@ -405,7 +509,6 @@ export const AdminPanel: React.FC = () => {
                     <div className="text-xs text-slate-300 mb-2 italic">No departure times set</div>
                   )}
 
-                  {/* Edit departure times */}
                   {editingVehicleId === v.id ? (
                     <div className="space-y-2 mt-2 pt-2 border-t border-slate-100">
                       <p className="text-xs font-bold text-slate-600 flex items-center gap-1"><Clock size={12} /> Set Departure Times</p>
@@ -443,63 +546,43 @@ export const AdminPanel: React.FC = () => {
         {activeView === 'add' && (
           <div className="space-y-4 bg-white p-6 rounded-3xl shadow-sm">
             <h2 className="font-bold text-slate-800">Bulk Registration</h2>
-
             <div className="bg-blue-50 rounded-2xl p-3 text-xs text-blue-700">
               <p className="font-bold mb-1">How it works:</p>
-              <p>Generate IDs like <span className="font-mono font-bold">BAN-CHE-0101</span> for Bangalore↔Chennai buses. Each ID is permanent for that physical bus. Set departure times for both directions!</p>
+              <p>Generate IDs like <span className="font-mono font-bold">BAN-CHE-0101</span> for Bangalore↔Chennai buses. Each ID is permanent for that physical bus.</p>
             </div>
-
-            <input placeholder="Operator Name (e.g. KSRTC, NueGo)"
-              className="w-full p-4 bg-slate-50 rounded-2xl outline-none text-sm"
+            <input placeholder="Operator Name (e.g. KSRTC, NueGo)" className="w-full p-4 bg-slate-50 rounded-2xl outline-none text-sm"
               value={form.operator} onChange={e => setForm({ ...form, operator: e.target.value })} />
-
             <div className="flex gap-2">
               <input placeholder="From City" className="flex-1 p-4 bg-slate-50 rounded-2xl outline-none text-sm"
                 value={form.from_location} onChange={e => setForm({ ...form, from_location: e.target.value })} />
               <input placeholder="To City" className="flex-1 p-4 bg-slate-50 rounded-2xl outline-none text-sm"
                 value={form.to_location} onChange={e => setForm({ ...form, to_location: e.target.value })} />
             </div>
-
-            {/* ── DEPARTURE TIMES ── */}
             <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
               <p className="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1.5"><Clock size={13} /> Departure Times (Both Directions)</p>
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1.5">
-                    → <span className="font-semibold">{form.from_location || 'Origin'}</span> departure time
-                  </label>
-                  <input type="time" value={form.forward_departure}
-                    onChange={e => setForm({ ...form, forward_departure: e.target.value })}
-                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1.5">
-                    ← <span className="font-semibold">{form.to_location || 'Destination'}</span> departure time (return)
-                  </label>
-                  <input type="time" value={form.return_departure}
-                    onChange={e => setForm({ ...form, return_departure: e.target.value })}
-                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400" />
-                </div>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1.5">→ <span className="font-semibold">{form.from_location || 'Origin'}</span> departure time</label>
+                <input type="time" value={form.forward_departure} onChange={e => setForm({ ...form, forward_departure: e.target.value })}
+                  className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400" />
               </div>
-              <p className="text-xs text-slate-400">💡 These times apply to all buses on this route. Can be edited per bus later.</p>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1.5">← <span className="font-semibold">{form.to_location || 'Destination'}</span> departure time (return)</label>
+                <input type="time" value={form.return_departure} onChange={e => setForm({ ...form, return_departure: e.target.value })}
+                  className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400" />
+              </div>
+              <p className="text-xs text-slate-400">💡 Can be edited per bus later.</p>
             </div>
-
-            {/* ID preview */}
             {form.from_location && form.to_location && (
               <div className="bg-blue-50 rounded-xl p-3">
                 <p className="text-xs text-blue-600 font-bold">ID format: <span className="font-mono">{generateRoutePrefix(form.from_location, form.to_location)}-0101</span></p>
               </div>
             )}
-
-            {/* Count slider */}
             <div className="p-4 bg-slate-50 rounded-2xl">
               <p className="text-xs font-bold text-blue-600 mb-2 uppercase">Quantity: {form.count}</p>
               <input type="range" min="1" max="20" value={form.count} className="w-full accent-blue-600"
                 onChange={e => setForm({ ...form, count: parseInt(e.target.value) })} />
               <div className="flex justify-between text-xs text-slate-400 mt-1"><span>1</span><span>20</span></div>
             </div>
-
-            {/* Vehicle type */}
             <div className="flex gap-2">
               {['bus', 'mini-bus', 'sleeper', 'ac-sleeper'].map(type => (
                 <button key={type} type="button" onClick={() => setForm({ ...form, vehicle_type: type })}
@@ -508,11 +591,7 @@ export const AdminPanel: React.FC = () => {
                 </button>
               ))}
             </div>
-
-            <button onClick={handlePreview} className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl">
-              Preview IDs
-            </button>
-
+            <button onClick={handlePreview} className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl">Preview IDs</button>
             {previewIds.length > 0 && (
               <div className="pt-4 border-t space-y-4">
                 <p className="text-xs font-bold text-slate-600">{previewIds.length} IDs will be created:</p>
@@ -630,6 +709,138 @@ export const AdminPanel: React.FC = () => {
                 </motion.div>
               ))
             )}
+          </div>
+        )}
+
+        {/* ── CONTESTS TAB ── */}
+        {activeView === 'contests' && (
+          <div className="space-y-4">
+
+            {/* Today's contest */}
+            <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-4 text-white">
+              <p className="text-xs font-bold opacity-80 uppercase tracking-wide mb-1">Today's Contest</p>
+              <p className="text-xl font-black">{todayContest.name}</p>
+              <p className="text-sm opacity-90">{todayContest.desc}</p>
+            </div>
+
+            {/* Weekly schedule */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Weekly Schedule</p>
+              <div className="space-y-2">
+                {CONTEST_SCHEDULE.map((c, i) => (
+                  <div key={i} className={`flex items-center justify-between py-1.5 px-2 rounded-lg ${c.day === DAY_NAMES[new Date().getDay()] ? 'bg-yellow-50 border border-yellow-200' : ''}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold w-20 ${c.day === DAY_NAMES[new Date().getDay()] ? 'text-yellow-600' : 'text-slate-400'}`}>{c.day}</span>
+                      <span className="text-xs text-slate-700 font-medium">{c.name}</span>
+                    </div>
+                    {c.day === DAY_NAMES[new Date().getDay()] && <span className="text-xs bg-yellow-400 text-white px-2 py-0.5 rounded-full font-bold">TODAY</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Coupon stock */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-black text-green-600">{availableCoupons}</p>
+                <p className="text-xs text-green-600 font-bold">Available</p>
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-black text-slate-400">{usedCoupons}</p>
+                <p className="text-xs text-slate-400 font-bold">Used</p>
+              </div>
+            </div>
+
+            {/* Upload coupons */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Ticket size={13} /> Upload Coupon Codes
+              </p>
+              <textarea
+                value={couponInput}
+                onChange={e => setCouponInput(e.target.value)}
+                placeholder="Paste coupon codes here&#10;One per line or comma separated&#10;e.g.&#10;ZOMATO50&#10;SWIGGY100&#10;FOOD200"
+                className="w-full h-32 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-mono outline-none focus:border-blue-400 resize-none"
+              />
+              <p className="text-xs text-slate-400 mt-1 mb-3">
+                {couponInput.split(/[\n,]/).filter(c => c.trim()).length} code{couponInput.split(/[\n,]/).filter(c => c.trim()).length !== 1 ? 's' : ''} detected
+              </p>
+              <button onClick={handleUploadCoupons} disabled={savingCoupons || !couponInput.trim()}
+                className="w-full py-3 bg-green-500 text-white font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2">
+                {savingCoupons ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                {savingCoupons ? 'Uploading...' : 'Upload Coupons'}
+              </button>
+            </div>
+
+            {/* Coupon list */}
+            {coupons.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">All Coupons ({coupons.length})</p>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {coupons.map(coupon => (
+                    <div key={coupon.id} className={`flex items-center justify-between p-2 rounded-lg ${coupon.is_used ? 'bg-slate-50' : 'bg-green-50'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-mono font-bold ${coupon.is_used ? 'text-slate-400 line-through' : 'text-green-700'}`}>{coupon.code}</span>
+                        {coupon.is_used && <span className="text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded-full">USED</span>}
+                      </div>
+                      {!coupon.is_used && (
+                        <button onClick={() => handleDeleteCoupon(coupon.id)} className="p-1 text-slate-300 hover:text-red-400 transition-colors">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Manually trigger winner */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Trophy size={13} /> Manually Pick Winner
+              </p>
+              <p className="text-xs text-slate-400 mb-3">Enter a vehicle ID to manually trigger winner selection for that journey.</p>
+              <div className="flex gap-2">
+                <input type="text" placeholder="e.g. BAN-CHE-0101"
+                  value={contestVehicleId} onChange={e => setContestVehicleId(e.target.value.toUpperCase())}
+                  className="flex-1 h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-mono outline-none focus:border-yellow-400" />
+                <button onClick={handleTriggerWinner} disabled={!!triggeringWinner || !contestVehicleId.trim()}
+                  className="px-4 py-2 bg-yellow-400 text-white font-bold rounded-xl disabled:opacity-50 flex items-center gap-1.5 text-sm">
+                  {triggeringWinner ? <Loader2 size={14} className="animate-spin" /> : <Trophy size={14} />}
+                  Pick
+                </button>
+              </div>
+            </div>
+
+            {/* Winners history */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Trophy size={13} className="text-yellow-500" /> Winners History
+              </p>
+              {winners.length === 0 ? (
+                <div className="text-center py-8 text-slate-400"><Trophy size={32} className="mx-auto mb-2 opacity-20" /><p className="text-xs">No winners yet</p></div>
+              ) : (
+                <div className="space-y-3">
+                  {winners.map(winner => (
+                    <div key={winner.id} className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-100 rounded-xl">
+                      <div className="w-9 h-9 rounded-full bg-yellow-400 flex items-center justify-center text-white font-black text-sm flex-shrink-0">🏆</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">{winner.winner_name}</p>
+                        <p className="text-xs text-slate-500 truncate">{winner.contest_type} • {winner.vehicle_id}</p>
+                        <p className="text-xs text-slate-400">{new Date(winner.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs font-bold text-yellow-600">{winner.score} pts</p>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${winner.email_sent ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}`}>
+                          {winner.email_sent ? '✉️ Sent' : '⏳ Pending'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
         )}
       </div>

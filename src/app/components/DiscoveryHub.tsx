@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp, type VibeStatus } from '../context/AppContext';
 import { Switch } from './ui/switch';
-import { MessageCircle, User as UserIcon, EyeOff, Eye, Loader2, Zap, Radio, Users, MapPin, Shield, Flag, Ban, X } from 'lucide-react';
+import { MessageCircle, User as UserIcon, EyeOff, Eye, Loader2, Zap, Radio, Users, MapPin, Shield, Flag, Ban, X, Trophy } from 'lucide-react';
 import { MutualMatchModal } from './MutualMatchModal';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -30,6 +30,16 @@ const REPORT_REASONS = [
   'Spam',
   'Making me uncomfortable',
   'Other',
+];
+
+const CONTEST_SCHEDULE = [
+  { name: 'All Rounder 🏆', desc: 'Combined score wins', criteria: 'combined' },
+  { name: 'Social Butterfly 🦋', desc: 'Send the most pings!', criteria: 'pings_sent' },
+  { name: 'Best Connector 🤝', desc: 'Most mutual matches!', criteria: 'mutual_matches' },
+  { name: 'Lounge Star 💬', desc: 'Most active in chat!', criteria: 'messages_sent' },
+  { name: 'Early Bird 🐦', desc: 'First to check in!', criteria: 'first_checkin' },
+  { name: 'Friend Magnet 👥', desc: 'Add the most friends!', criteria: 'friends_added' },
+  { name: 'Lucky Draw 🎰', desc: 'Everyone has equal chance!', criteria: 'random' },
 ];
 
 interface CheckinUser {
@@ -60,15 +70,25 @@ export const DiscoveryHub: React.FC = () => {
   const [pingedUsers, setPingedUsers] = useState<Set<string>>(new Set());
   const [hasActiveJourney, setHasActiveJourney] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const [myScore, setMyScore] = useState(0);
+  const [myRank, setMyRank] = useState<number | null>(null);
+  const [userName, setUserName] = useState('');
+  const [userAvatar, setUserAvatar] = useState('');
 
-  // Report modal state
+  // Report modal
   const [reportTarget, setReportTarget] = useState<CheckinUser | null>(null);
   const [reportReason, setReportReason] = useState('');
   const [reportLoading, setReportLoading] = useState(false);
 
+  const todayContest = CONTEST_SCHEDULE[new Date().getDay()];
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) navigate('/');
+      else {
+        setUserName(user.user_metadata?.full_name || '');
+        setUserAvatar(user.user_metadata?.avatar_url || '');
+      }
     });
   }, [navigate]);
 
@@ -95,11 +115,44 @@ export const DiscoveryHub: React.FC = () => {
   const fetchBlockedUsers = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase
-      .from('blocked_users').select('blocked_id')
-      .eq('blocker_id', user.id);
-    if (data) setBlockedUsers(new Set(data.map(b => b.blocked_id)));
+    const { data } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', user.id);
+    if (data) setBlockedUsers(new Set(data.map((b: any) => b.blocked_id)));
   }, []);
+
+  // ── Calculate live contest score ──────────────────────────
+  const calculateMyScore = useCallback(async (vehicleId: string, userId: string) => {
+    const criteria = todayContest.criteria;
+    let score = 0;
+
+    if (criteria === 'random') {
+      score = 1; // everyone participates
+    } else if (criteria === 'pings_sent') {
+      const { count } = await supabase.from('pings').select('*', { count: 'exact', head: true }).eq('from_user_id', userId);
+      score = count || 0;
+    } else if (criteria === 'mutual_matches') {
+      const { data: sent } = await supabase.from('pings').select('to_user_id').eq('from_user_id', userId);
+      const { data: received } = await supabase.from('pings').select('from_user_id').eq('to_user_id', userId);
+      const sentIds = sent?.map(p => p.to_user_id) || [];
+      const receivedIds = received?.map(p => p.from_user_id) || [];
+      score = sentIds.filter(id => receivedIds.includes(id)).length;
+    } else if (criteria === 'messages_sent') {
+      const { count } = await supabase.from('lounge_messages').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('vehicle_id', vehicleId);
+      score = count || 0;
+    } else if (criteria === 'first_checkin') {
+      const { data: checkins } = await supabase.from('checkins').select('user_id, created_at').eq('vehicle_id', vehicleId).order('created_at', { ascending: true }).limit(1);
+      score = checkins?.[0]?.user_id === userId ? 1 : 0;
+    } else if (criteria === 'friends_added') {
+      const { count } = await supabase.from('friends').select('*', { count: 'exact', head: true }).or(`requester_id.eq.${userId},receiver_id.eq.${userId}`).eq('status', 'accepted');
+      score = count || 0;
+    } else if (criteria === 'combined') {
+      const { count: pings } = await supabase.from('pings').select('*', { count: 'exact', head: true }).eq('from_user_id', userId);
+      const { count: msgs } = await supabase.from('lounge_messages').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('vehicle_id', vehicleId);
+      const { count: friends } = await supabase.from('friends').select('*', { count: 'exact', head: true }).or(`requester_id.eq.${userId},receiver_id.eq.${userId}`).eq('status', 'accepted');
+      score = ((pings || 0) * 5) + ((msgs || 0) * 3) + ((friends || 0) * 15);
+    }
+
+    setMyScore(score);
+  }, [todayContest]);
 
   useEffect(() => {
     const init = async () => {
@@ -121,14 +174,26 @@ export const DiscoveryHub: React.FC = () => {
       const users = await fetchNearbyUsers(checkin.vehicle_id, user.id);
       setNearbyUsers(users);
       await fetchBlockedUsers();
+      await calculateMyScore(checkin.vehicle_id, user.id);
       setLoading(false);
     };
     init();
-  }, [fetchCurrentCheckin, fetchNearbyUsers, fetchBlockedUsers]);
+  }, [fetchCurrentCheckin, fetchNearbyUsers, fetchBlockedUsers, calculateMyScore]);
 
   const handleJourneyExpired = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate('/'); return; }
+
+    // ── Pick contest winner before cleanup ────────────────
+    if (currentCheckin?.vehicle_id) {
+      try {
+        await supabase.functions.invoke('pick-winner', {
+          body: { vehicle_id: currentCheckin.vehicle_id }
+        });
+      } catch (err) {
+        console.error('Failed to pick winner:', err);
+      }
+    }
 
     if (currentCheckin?.vehicle_id) {
       await supabase.from('lounge_messages').delete().eq('vehicle_id', currentCheckin.vehicle_id);
@@ -225,17 +290,17 @@ export const DiscoveryHub: React.FC = () => {
       toast.success(`Pinged ${user.name}! 👋`);
       setPingedUsers(prev => new Set([...prev, user.id]));
       notify.ping(user.user_id, currentCheckin.name);
+      // Refresh score after ping
+      await calculateMyScore(currentCheckin.vehicle_id, authUser.id);
     }
     setPingLoading(null);
   };
 
-  // ── Report user ───────────────────────────────────────────
   const handleReport = async () => {
     if (!reportTarget || !reportReason) { toast.error('Please select a reason'); return; }
     setReportLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
     const { error } = await supabase.from('reports').insert({
       reporter_id: user.id,
       reported_id: reportTarget.user_id,
@@ -243,42 +308,29 @@ export const DiscoveryHub: React.FC = () => {
       context: `Discovery Hub — Vehicle: ${currentCheckin?.vehicle_id}`,
       status: 'pending',
     });
-
     if (!error) {
       toast.success(`${reportTarget.name} reported. Our team will review. 🛡️`);
-      setReportTarget(null);
-      setReportReason('');
-    } else {
-      toast.error('Failed to submit report');
-    }
+      setReportTarget(null); setReportReason('');
+    } else toast.error('Failed to submit report');
     setReportLoading(false);
   };
 
-  // ── Block user ────────────────────────────────────────────
   const handleBlock = async (targetUser: CheckinUser) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
-    const { error } = await supabase.from('blocked_users').insert({
-      blocker_id: user.id,
-      blocked_id: targetUser.user_id,
-    });
-
+    const { error } = await supabase.from('blocked_users').insert({ blocker_id: user.id, blocked_id: targetUser.user_id });
     if (!error) {
       setBlockedUsers(prev => new Set([...prev, targetUser.user_id]));
-      // Remove from nearby users list
       setNearbyUsers(prev => prev.filter(u => u.user_id !== targetUser.user_id));
       setSelectedUser(null);
-      toast.success(`${targetUser.name} blocked. They won't appear in your journey.`);
-    } else {
-      toast.error('Failed to block user');
-    }
+      toast.success(`${targetUser.name} blocked.`);
+    } else toast.error('Failed to block user');
   };
 
   const filteredUsers = (professionFilter === 'All'
     ? nearbyUsers
     : nearbyUsers.filter(u => u.profession.toLowerCase().includes(professionFilter.toLowerCase()))
-  ).filter(u => !blockedUsers.has(u.user_id)); // ← filter blocked users
+  ).filter(u => !blockedUsers.has(u.user_id));
 
   const totalDuration = currentCheckin
     ? (new Date(currentCheckin.expires_at).getTime() - new Date(currentCheckin.arrival_time).getTime()) / 1000
@@ -287,6 +339,7 @@ export const DiscoveryHub: React.FC = () => {
   const hours = Math.floor(timeRemaining / 3600);
   const mins = Math.floor((timeRemaining % 3600) / 60);
   const secs = timeRemaining % 60;
+  const initials = userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
   if (loading) {
     return (
@@ -313,17 +366,12 @@ export const DiscoveryHub: React.FC = () => {
       {/* ── REPORT MODAL ── */}
       <AnimatePresence>
         {reportTarget && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
             onClick={() => setReportTarget(null)}>
-            <motion.div
-              initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }}
-              transition={{ type: 'spring', damping: 25 }}
+            <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} transition={{ type: 'spring', damping: 25 }}
               onClick={e => e.stopPropagation()}
               style={{ width: '100%', maxWidth: 480, background: '#fff', borderRadius: '24px 24px 0 0', padding: '24px 20px 40px', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)' }}>
-
-              {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -339,22 +387,16 @@ export const DiscoveryHub: React.FC = () => {
                   <X style={{ width: 14, height: 14, color: '#64748b' }} />
                 </motion.button>
               </div>
-
-              {/* Reason selection */}
               <p style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Select reason</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
                 {REPORT_REASONS.map(reason => (
-                  <motion.button key={reason} whileTap={{ scale: 0.98 }}
-                    onClick={() => setReportReason(reason)}
-                    style={{ padding: '12px 16px', borderRadius: 12, border: reportReason === reason ? '2px solid #ef4444' : '1.5px solid rgba(148,163,184,0.2)', background: reportReason === reason ? 'rgba(239,68,68,0.06)' : 'rgba(248,250,252,1)', cursor: 'pointer', textAlign: 'left', fontSize: 14, color: reportReason === reason ? '#dc2626' : '#374151', fontWeight: reportReason === reason ? 600 : 400, transition: 'all 0.15s' }}>
+                  <motion.button key={reason} whileTap={{ scale: 0.98 }} onClick={() => setReportReason(reason)}
+                    style={{ padding: '12px 16px', borderRadius: 12, border: reportReason === reason ? '2px solid #ef4444' : '1.5px solid rgba(148,163,184,0.2)', background: reportReason === reason ? 'rgba(239,68,68,0.06)' : '#f8fafc', cursor: 'pointer', textAlign: 'left', fontSize: 14, color: reportReason === reason ? '#dc2626' : '#374151', fontWeight: reportReason === reason ? 600 : 400, transition: 'all 0.15s' }}>
                     {reason}
                   </motion.button>
                 ))}
               </div>
-
-              <motion.button whileTap={{ scale: 0.97 }}
-                onClick={handleReport}
-                disabled={!reportReason || reportLoading}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={handleReport} disabled={!reportReason || reportLoading}
                 style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', cursor: reportReason ? 'pointer' : 'default', background: reportReason ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(148,163,184,0.15)', color: reportReason ? '#fff' : '#94a3b8', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 {reportLoading ? <Loader2 style={{ width: 18, height: 18 }} className="animate-spin" /> : <Flag style={{ width: 16, height: 16 }} />}
                 {reportLoading ? 'Submitting...' : 'Submit Report'}
@@ -373,48 +415,81 @@ export const DiscoveryHub: React.FC = () => {
       </div>
 
       {/* ── TOP BAR ── */}
-      <div style={{ position: 'relative', zIndex: 20, padding: '16px 20px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-            <motion.div style={{ width: 7, height: 7, borderRadius: '50%', background: hasActiveJourney ? '#22c55e' : '#94a3b8' }}
+      <div style={{ position: 'relative', zIndex: 20, padding: '12px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+
+        {/* Profile avatar top left */}
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate('/profile')}
+          style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #1E88E5, #FF6B35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', boxShadow: '0 2px 8px rgba(30,136,229,0.3)' }}>
+          {userAvatar ? (
+            <img src={userAvatar} alt={userName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          ) : (
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{initials || '?'}</span>
+          )}
+        </motion.button>
+
+        {/* Vehicle + route */}
+        <div style={{ flex: 1, textAlign: 'center', padding: '0 8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 1 }}>
+            <motion.div style={{ width: 6, height: 6, borderRadius: '50%', background: hasActiveJourney ? '#22c55e' : '#94a3b8' }}
               animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }} transition={{ duration: 2, repeat: Infinity }} />
             <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
               {hasActiveJourney ? 'Live' : 'No Journey'}
             </span>
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, lineHeight: 1.2, background: 'linear-gradient(90deg, #1E88E5, #FF6B35)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, lineHeight: 1.2, background: 'linear-gradient(90deg, #1E88E5, #FF6B35)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             {hasActiveJourney ? currentCheckin?.vehicle_id : 'Destiny'}
           </h1>
-          <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-            {hasActiveJourney ? `${currentCheckin?.from_location} → ${currentCheckin?.to_location}` : 'Start a new journey to connect'}
+          <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>
+            {hasActiveJourney ? `${currentCheckin?.from_location} → ${currentCheckin?.to_location}` : 'Start a new journey'}
           </p>
         </div>
 
+        {/* Timer */}
         {hasActiveJourney && (
-          <div style={{ position: 'relative', width: 58, height: 58, flexShrink: 0 }}>
-            <svg width="58" height="58" style={{ transform: 'rotate(-90deg)', position: 'absolute', inset: 0 }}>
+          <div style={{ position: 'relative', width: 52, height: 52, flexShrink: 0 }}>
+            <svg width="52" height="52" style={{ transform: 'rotate(-90deg)', position: 'absolute', inset: 0 }}>
               <defs>
                 <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#1E88E5" />
-                  <stop offset="100%" stopColor="#FF6B35" />
+                  <stop offset="0%" stopColor="#1E88E5" /><stop offset="100%" stopColor="#FF6B35" />
                 </linearGradient>
               </defs>
-              <circle cx="29" cy="29" r="23" fill="none" stroke="rgba(30,136,229,0.12)" strokeWidth="3.5" />
-              <circle cx="29" cy="29" r="23" fill="none" stroke="url(#timerGrad)" strokeWidth="3.5"
-                strokeLinecap="round" strokeDasharray={`${2 * Math.PI * 23}`}
-                strokeDashoffset={2 * Math.PI * 23 * (1 - progress)} />
+              <circle cx="26" cy="26" r="20" fill="none" stroke="rgba(30,136,229,0.12)" strokeWidth="3" />
+              <circle cx="26" cy="26" r="20" fill="none" stroke="url(#timerGrad)" strokeWidth="3"
+                strokeLinecap="round" strokeDasharray={`${2 * Math.PI * 20}`}
+                strokeDashoffset={2 * Math.PI * 20 * (1 - progress)} />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#1E88E5', lineHeight: 1 }}>{String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}</span>
-              <span style={{ fontSize: 8, color: '#94a3b8', marginTop: 1 }}>{String(secs).padStart(2, '0')}s</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: '#1E88E5', lineHeight: 1 }}>{String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}</span>
+              <span style={{ fontSize: 7, color: '#94a3b8', marginTop: 1 }}>{String(secs).padStart(2, '0')}s</span>
             </div>
           </div>
         )}
       </div>
 
+      {/* ── CONTEST BANNER ── */}
+      {hasActiveJourney && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          onClick={() => navigate('/contest')}
+          style={{ margin: '0 16px 8px', borderRadius: 14, background: 'linear-gradient(135deg, #f59e0b, #d97706)', padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'relative', zIndex: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 22 }}>🏆</span>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 800, color: '#fff', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today's Contest</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: 0 }}>{todayContest.name}</p>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', margin: 0 }}>{todayContest.desc}</p>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Score</p>
+            <p style={{ fontSize: 24, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1 }}>{myScore}</p>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', margin: '2px 0 0' }}>Tap for leaderboard</p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Filter pills */}
       {hasActiveJourney && (
-        <div style={{ position: 'relative', zIndex: 20, display: 'flex', gap: 8, padding: '0 20px 10px', overflowX: 'auto', scrollbarWidth: 'none', flexShrink: 0 }}>
+        <div style={{ position: 'relative', zIndex: 20, display: 'flex', gap: 8, padding: '0 16px 8px', overflowX: 'auto', scrollbarWidth: 'none', flexShrink: 0 }}>
           {professionFilters.map(f => (
             <motion.button key={f} whileTap={{ scale: 0.93 }} onClick={() => setProfessionFilter(f)}
               style={{ padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', border: professionFilter === f ? '1.5px solid rgba(30,136,229,0.5)' : '1.5px solid rgba(30,136,229,0.1)', background: professionFilter === f ? 'rgba(30,136,229,0.12)' : 'rgba(255,255,255,0.6)', color: professionFilter === f ? '#1565C0' : '#94a3b8', backdropFilter: 'blur(8px)', transition: 'all 0.2s', cursor: 'pointer' }}>
@@ -434,9 +509,7 @@ export const DiscoveryHub: React.FC = () => {
               <span style={{ fontSize: 36 }}>👋</span>
             </motion.div>
             <h3 style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', margin: '0 0 8px' }}>Welcome back!</h3>
-            <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 28px', lineHeight: 1.6 }}>
-              You don't have an active journey right now.<br />Ready to meet new travelers?
-            </p>
+            <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 28px', lineHeight: 1.6 }}>You don't have an active journey right now.<br />Ready to meet new travelers?</p>
             <motion.button whileTap={{ scale: 0.96 }} onClick={() => navigate('/check-in')}
               style={{ width: '100%', maxWidth: 280, padding: '15px 32px', borderRadius: 16, fontSize: 15, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #1E88E5, #1565C0)', border: 'none', cursor: 'pointer', boxShadow: '0 8px 24px rgba(30,136,229,0.3)', marginBottom: 12 }}>
               🚀 Start New Journey
@@ -535,7 +608,6 @@ export const DiscoveryHub: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* ── Expanded action panel ── */}
                     <AnimatePresence>
                       {isSelected && (
                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
@@ -552,7 +624,6 @@ export const DiscoveryHub: React.FC = () => {
                               Message
                             </motion.button>
                           </div>
-                          {/* ── Report + Block row ── */}
                           <div style={{ display: 'flex', gap: 8, padding: '0 14px 10px' }}>
                             <motion.button whileTap={{ scale: 0.96 }}
                               onClick={e => { e.stopPropagation(); setReportTarget(user); setReportReason(''); }}
@@ -608,13 +679,13 @@ export const DiscoveryHub: React.FC = () => {
         </div>
       )}
 
-      {/* ── BOTTOM NAV ── */}
+      {/* ── BOTTOM NAV — Profile replaced with Contest ── */}
       <div style={{ position: 'relative', zIndex: 20, flexShrink: 0, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(30,136,229,0.08)', padding: '8px 0 max(12px, env(safe-area-inset-bottom))', display: 'flex', justifyContent: 'space-around' }}>
         {[
           { icon: <Radio style={{ width: 22, height: 22 }} />, label: 'Discover', active: true, action: () => {} },
           { icon: <MessageCircle style={{ width: 22, height: 22 }} />, label: 'Lounge', active: false, action: () => navigate('/lounge') },
           { icon: <Users style={{ width: 22, height: 22 }} />, label: 'Friends', active: false, action: () => navigate('/friends') },
-          { icon: <UserIcon style={{ width: 22, height: 22 }} />, label: 'Profile', active: false, action: () => navigate('/profile') },
+          { icon: <Trophy style={{ width: 22, height: 22 }} />, label: 'Contest', active: false, action: () => navigate('/contest') },
         ].map(item => (
           <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 20px', color: item.active ? '#1E88E5' : '#94a3b8' }}>

@@ -1,6 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
 import { Login } from './components/Login';
-import { AuthCallback } from './components/AuthCallback';
 import { CheckIn } from './components/CheckIn';
 import { DiscoveryHub } from './components/DiscoveryHub';
 import { Lounge } from './components/Lounge';
@@ -13,10 +12,10 @@ import { SafetySOS } from './components/SafetySOS';
 import { UserProfile } from './components/UserProfile';
 import { NotifyMe } from './components/NotifyMe';
 import { AdminPanel } from './components/AdminPanel';
+import { ContestPage } from './components/ContestPage';
 
 export const router = createBrowserRouter([
   { path: '/', Component: Login },
-  { path: '/auth/callback', Component: AuthCallback },
   { path: '/check-in', Component: CheckIn },
   { path: '/discovery', Component: DiscoveryHub },
   { path: '/lounge', Component: Lounge },
@@ -31,4 +30,5 @@ export const router = createBrowserRouter([
   { path: '/notify-me', Component: NotifyMe },
   { path: '/private-chat', Component: PrivateChat },
   { path: '/admin', Component: AdminPanel },
+  { path: '/contest', Component: ContestPage },
 ]);

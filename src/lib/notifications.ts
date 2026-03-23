@@ -98,8 +98,10 @@ export async function sendPushNotification({
   url?: string;
 }): Promise<void> {
   try {
+    const { data: { session } } = await supabase.auth.getSession();
     await supabase.functions.invoke('send-push-notification', {
       body: { user_id: userId, title, body, url },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
     });
   } catch (err) {
     console.error('Failed to send push notification:', err);

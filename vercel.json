@@ -1,29 +1,8 @@
 {
-  "routes": [
+  "rewrites": [
     {
-      "src": "/google(.*)\\.html",
-      "dest": "/google$1.html"
-    },
-    {
-      "src": "/sitemap\\.xml",
-      "dest": "/sitemap.xml"
-    },
-    {
-      "src": "/robots\\.txt",
-      "dest": "/robots.txt"
-    },
-    {
-      "src": "/sw\\.js",
-      "dest": "/sw.js"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "/[^.]+",
-      "dest": "/",
-      "status": 200
+      "source": "/((?!.*\\.).*)",
+      "destination": "/index.html"
     }
   ]
 }

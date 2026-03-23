@@ -8,6 +8,7 @@ import { MapPin, Briefcase, Bus, Train, Search, Loader2, Navigation, Clock, Rout
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { WaitingGame } from './WaitingGame';
+import { AdSlot } from './AdSlot';
 
 type TabType = 'reserved-train' | 'reserved-bus' | 'route-match';
 
@@ -562,6 +563,10 @@ export const CheckIn: React.FC = () => {
                 <label className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5" /> Your Profession</label>
                 <Input type="text" placeholder="e.g., Software Engineer, Student..." value={profession} onChange={(e) => setProfession(e.target.value)} className="h-12 rounded-xl border-2 border-gray-200 focus:border-[#534AB7] bg-white text-sm" />
               </div>
+            </div>
+
+            <div className="mb-5">
+              <AdSlot />
             </div>
 
             <AnimatePresence mode="wait">

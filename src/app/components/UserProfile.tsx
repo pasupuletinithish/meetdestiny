@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { notify } from '../../lib/notifications';
 import { NotificationSettings } from './NotificationSettings';
+import { AdSlot } from './AdSlot';
 
 type VibeStatus = 'ready' | 'logistics' | 'lurking';
 
@@ -138,10 +139,11 @@ function ProfileBanner({ name, profession, vibe, isOwn }: {
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ fontSize: 18, fontWeight: 800, color: '#fff', margin: '0 0 2px', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</h1>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 5px' }}>{profession}</p>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.12)', borderRadius: 14, padding: '3px 10px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.12)', borderRadius: 14, padding: '3px 10px', marginBottom: '10px' }}>
             <div style={{ width: 5, height: 5, borderRadius: '50%', background: vibe.color }} />
             <span style={{ fontSize: 10, color: '#fff', fontWeight: 500 }}>{vibe.label}</span>
           </div>
+          <AdSlot variant="mini" />
         </div>
         {isOwn && (
           <div style={{ background: 'linear-gradient(135deg, #FF6B35, #E85A2B)', borderRadius: 16, padding: '4px 10px', flexShrink: 0 }}>

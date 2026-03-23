@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { MessageCircle, Users, MapPin, Radio, User as UserIcon, BellOff, Bell, Loader2, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
+import { AdSlot } from './AdSlot';
 
 interface CheckinData {
   id: string;
@@ -222,6 +223,10 @@ export const Lounge: React.FC = () => {
             </span>
           </div>
         )}
+      </div>
+
+      <div style={{ padding: '0 16px', marginTop: '14px', position: 'relative', zIndex: 10 }}>
+        <AdSlot />
       </div>
 
       {/* ── CARDS ── */}

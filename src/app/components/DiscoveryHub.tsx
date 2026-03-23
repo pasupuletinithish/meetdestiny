@@ -529,15 +529,19 @@ await supabase.functions.invoke('pick-winner', {
 
         ) : filteredUsers.length === 0 ? (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '0 24px' }}>
-            <div style={{ position: 'relative', width: 96, height: 96, marginBottom: 20 }}>
+            <div style={{ position: 'relative', width: 120, height: 120, marginBottom: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {[0, 1, 2].map(i => (
-                <motion.div key={i} style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `1.5px solid rgba(30,136,229,${0.35 - i * 0.1})` }}
-                  animate={{ scale: [1, 2 + i * 0.4], opacity: [0.6, 0] }}
-                  transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.7, ease: 'easeOut' }} />
+                <motion.div key={i} style={{ position: 'absolute', width: 60, height: 60, borderRadius: '50%', border: '1.5px solid #1E88E5' }}
+                  animate={{ scale: [1, 3], opacity: [0.6, 0] }}
+                  transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.8, ease: 'easeOut' }} />
               ))}
-              <motion.div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(30,136,229,0.1), rgba(255,107,53,0.1))', border: '1.5px solid rgba(30,136,229,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}>
-                <Radio style={{ width: 28, height: 28, color: '#1E88E5' }} />
+              <motion.div style={{ position: 'absolute', width: 90, height: 90, borderRadius: '50%', border: '1.5px dashed rgba(255,107,53,0.5)' }}
+                animate={{ rotate: 360 }} transition={{ duration: 12, repeat: Infinity, ease: 'linear' }} />
+              <motion.div style={{ position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: 'conic-gradient(from 0deg, transparent 70%, rgba(30,136,229,0.1) 90%, rgba(30,136,229,0.4) 100%)' }}
+                animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: 'linear' }} />
+              <motion.div style={{ position: 'relative', zIndex: 10, width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg, #1E88E5, #1565C0)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 25px rgba(30,136,229,0.6), inset 0 2px 6px rgba(255,255,255,0.4)' }}
+                animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}>
+                <Radio style={{ width: 24, height: 24, color: '#fff' }} />
               </motion.div>
             </div>
             <h3 style={{ fontSize: 17, fontWeight: 700, color: '#1e293b', marginBottom: 6, marginTop: 0 }}>Scanning your route</h3>

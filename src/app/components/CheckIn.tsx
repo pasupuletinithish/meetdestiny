@@ -136,28 +136,28 @@ function CompassLogo() {
   return (
     <svg width="56" height="56" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="cl1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#7F77DD"/><stop offset="100%" stopColor="#D4537E"/></linearGradient>
-        <linearGradient id="cl2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#534AB7"/><stop offset="100%" stopColor="#993556"/></linearGradient>
-        <linearGradient id="cl3" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor="#993556"/><stop offset="100%" stopColor="#D4537E"/></linearGradient>
-        <linearGradient id="cl4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#AFA9EC"/><stop offset="100%" stopColor="#ED93B1"/></linearGradient>
+        <linearGradient id="cl1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#7F77DD" /><stop offset="100%" stopColor="#D4537E" /></linearGradient>
+        <linearGradient id="cl2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#534AB7" /><stop offset="100%" stopColor="#993556" /></linearGradient>
+        <linearGradient id="cl3" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor="#993556" /><stop offset="100%" stopColor="#D4537E" /></linearGradient>
+        <linearGradient id="cl4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#AFA9EC" /><stop offset="100%" stopColor="#ED93B1" /></linearGradient>
       </defs>
       <g transform="translate(200,200)">
-        <circle cx="0" cy="0" r="148" fill="none" stroke="url(#cl1)" strokeWidth="0.5" opacity="0.12"/>
-        <circle cx="0" cy="0" r="116" fill="none" stroke="url(#cl2)" strokeWidth="1" opacity="0.25"/>
+        <circle cx="0" cy="0" r="148" fill="none" stroke="url(#cl1)" strokeWidth="0.5" opacity="0.12" />
+        <circle cx="0" cy="0" r="116" fill="none" stroke="url(#cl2)" strokeWidth="1" opacity="0.25" />
         <g stroke="url(#cl1)" strokeLinecap="round" opacity="0.5" strokeWidth="1.5">
-          <line x1="0" y1="-116" x2="0" y2="-100"/><line x1="0" y1="100" x2="0" y2="116"/>
-          <line x1="-116" y1="0" x2="-100" y2="0"/><line x1="100" y1="0" x2="116" y2="0"/>
+          <line x1="0" y1="-116" x2="0" y2="-100" /><line x1="0" y1="100" x2="0" y2="116" />
+          <line x1="-116" y1="0" x2="-100" y2="0" /><line x1="100" y1="0" x2="116" y2="0" />
         </g>
-        <circle cx="0" cy="0" r="96" fill="none" stroke="url(#cl2)" strokeWidth="1.8" opacity="0.6"/>
+        <circle cx="0" cy="0" r="96" fill="none" stroke="url(#cl2)" strokeWidth="1.8" opacity="0.6" />
         <text fontFamily="sans-serif" fontSize="15" fontWeight="600" fill="url(#cl3)" x="0" y="-104" textAnchor="middle" dominantBaseline="central">N</text>
-        <path d="M0 -92 L11 0 L0 16 L-11 0Z" fill="url(#cl3)"/>
-        <path d="M0 92 L6 0 L0 -16 L-6 0Z" fill="url(#cl4)" opacity="0.3"/>
-        <circle cx="0" cy="0" r="36" fill="white" stroke="url(#cl2)" strokeWidth="2"/>
-        <circle cx="-10" cy="-11" r="8" fill="#534AB7"/>
-        <path d="M-20 4 Q-10 14 0 4" fill="#534AB7"/>
-        <circle cx="10" cy="-11" r="8" fill="#D4537E"/>
-        <path d="M0 4 Q10 14 20 4" fill="#D4537E"/>
-        <circle cx="0" cy="-4" r="3.5" fill="white" opacity="0.9"/>
+        <path d="M0 -92 L11 0 L0 16 L-11 0Z" fill="url(#cl3)" />
+        <path d="M0 92 L6 0 L0 -16 L-6 0Z" fill="url(#cl4)" opacity="0.3" />
+        <circle cx="0" cy="0" r="36" fill="white" stroke="url(#cl2)" strokeWidth="2" />
+        <circle cx="-10" cy="-11" r="8" fill="#534AB7" />
+        <path d="M-20 4 Q-10 14 0 4" fill="#534AB7" />
+        <circle cx="10" cy="-11" r="8" fill="#D4537E" />
+        <path d="M0 4 Q10 14 20 4" fill="#D4537E" />
+        <circle cx="0" cy="-4" r="3.5" fill="white" opacity="0.9" />
       </g>
     </svg>
   );
@@ -617,7 +617,7 @@ export const CheckIn: React.FC = () => {
                     {loading
                       ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span>
                       : isTrainBlocked ? '🎮 Play while you wait!'
-                      : '🚆 Start Networking'}
+                        : '🚆 Start Networking'}
                   </Button>
                 </motion.form>
               )}
@@ -717,7 +717,7 @@ export const CheckIn: React.FC = () => {
                     {loading
                       ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span>
                       : isBusBlocked ? '🎮 Play while you wait!'
-                      : '🚌 Start Networking'}
+                        : '🚌 Start Networking'}
                   </Button>
                 </motion.form>
               )}

@@ -187,9 +187,12 @@ export const DiscoveryHub: React.FC = () => {
     // ── Pick contest winner before cleanup ────────────────
     if (currentCheckin?.vehicle_id) {
       try {
-        await supabase.functions.invoke('pick-winner', {
-          body: { vehicle_id: currentCheckin.vehicle_id }
-        });
+        // NEW — passes auth token
+const { data: { session } } = await supabase.auth.getSession();
+await supabase.functions.invoke('pick-winner', {
+  body: { vehicle_id: currentCheckin.vehicle_id },
+  headers: { Authorization: `Bearer ${session?.access_token}` },
+});
       } catch (err) {
         console.error('Failed to pick winner:', err);
       }

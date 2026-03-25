@@ -326,17 +326,26 @@ export const MultiplayerHub: React.FC = () => {
 
   const getStatusMessage = () => {
     if (gameState?.winner === 'draw') return "It's a Draw!";
-    if (gameState?.winner) return `${gameState.winner === 'P1' || gameState.winner === 'X' ? 'Player 1' : 'Player 2'} Wins! 🎉`;
+    
+    const p1Name = gameState?.p1 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p1)?.name || 'Opponent';
+    const p2Name = gameState?.p2 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p2)?.name || 'Opponent';
+    
+    if (gameState?.winner) {
+        const isP1 = gameState.winner === 'P1' || gameState.winner === 'X';
+        const wName = isP1 ? p1Name : p2Name;
+        return `${wName === 'You' ? 'You Win' : wName + ' Wins'}! 🎉`;
+    }
+
     if (gameState?.type === 'dash') return "Tap the 🚕 before they do! First to 10 wins!";
     
     const isMyTurn = (gameState?.xIsNext && gameState?.p1 === currentUser?.id) || (!gameState?.xIsNext && gameState?.p2 === currentUser?.id);
     
     if (gameState?.type === 'chess') {
         const myColor = gameState.p1 === currentUser?.id ? 'White' : 'Black';
-        return isMyTurn ? `🟢 Your Turn (${myColor})!` : `⏳ Waiting for opponent...`;
+        return isMyTurn ? `🟢 Your Turn (${myColor})!` : `⏳ Waiting for ${myColor === 'White' ? p2Name : p1Name}...`;
     }
     
-    return isMyTurn ? "🟢 Your Turn!" : "⏳ Waiting for opponent...";
+    return isMyTurn ? "🟢 Your Turn!" : `⏳ Waiting for ${gameState?.xIsNext ? p1Name : p2Name}...`;
   };
 
   const iAmWinner = gameState?.winner && gameState.winner !== 'draw' && (
@@ -472,10 +481,10 @@ export const MultiplayerHub: React.FC = () => {
               {/* Scoreboard / Players */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, background: '#f8fafc', padding: 8, borderRadius: 16 }}>
                 <div style={{ background: gameState?.p1 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#ef4444' : gameState?.type === 'chess' ? '#475569' : gameState?.type === 'dash' ? '#f59e0b' : '#0ea5e9', flex: 1, textAlign: 'center', boxShadow: gameState?.p1 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
-                  {gameState?.type === 'connect4' ? '🔴' : gameState?.type === 'chess' ? '♔' : gameState?.type === 'dash' ? 'P1' : '❌'} {gameState?.p1 === currentUser?.id ? 'You' : 'Opponent'}
+                  {gameState?.type === 'connect4' ? '🔴' : gameState?.type === 'chess' ? '♔' : gameState?.type === 'dash' ? 'P1' : '❌'} {gameState?.p1 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p1)?.name || 'Opponent'}
                 </div>
                 <div style={{ background: gameState?.p2 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#eab308' : gameState?.type === 'chess' ? '#0f172a' : gameState?.type === 'dash' ? '#d97706' : '#f43f5e', flex: 1, textAlign: 'center', boxShadow: gameState?.p2 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
-                  {gameState?.type === 'connect4' ? '🟡' : gameState?.type === 'chess' ? '♚' : gameState?.type === 'dash' ? 'P2' : '⭕'} {gameState?.p2 === currentUser?.id ? 'You' : 'Opponent'}
+                  {gameState?.type === 'connect4' ? '🟡' : gameState?.type === 'chess' ? '♚' : gameState?.type === 'dash' ? 'P2' : '⭕'} {gameState?.p2 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p2)?.name || 'Opponent'}
                 </div>
               </div>
 

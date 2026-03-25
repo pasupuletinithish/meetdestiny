@@ -14,8 +14,8 @@ const LEVELS = [
           {x: 0, y: 480, w: 800, h: 120, color: '#334155'},
           {x: 0, y: 0, w: 20, h: 600, color: '#334155'},
           {x: 780, y: 0, w: 20, h: 600, color: '#334155'},
-          {x: 400, y: 200, w: 30, h: 150, color: '#475569'},
-          {x: 200, y: 350, w: 100, h: 20, color: '#475569'},
+          {x: 400, y: 250, w: 30, h: 100, color: '#475569'},
+          {x: 200, y: 350, w: 120, h: 20, color: '#475569'},
           {x: 600, y: 420, w: 180, h: 60, color: '#334155'},
           {x: 660, y: 360, w: 120, h: 60, color: '#334155'},
           {x: 720, y: 300, w: 60, h: 60, color: '#334155'},
@@ -25,7 +25,7 @@ const LEVELS = [
       exit: {x: 730, y: 200, w: 40, h: 100, color: '#22c55e'},
       getDynamic: (a: boolean, b: boolean) => {
           let dyn = [];
-          if (!a) dyn.push({x: 240, y: 200, w: 20, h: 150, color: '#f59e0b', drawType: 'door'});
+          if (!a) dyn.push({x: 240, y: 250, w: 20, h: 100, color: '#f59e0b', drawType: 'door'});
           if (!b) dyn.push({x: 400, y: 350, w: 30, h: 130, color: '#3b82f6', drawType: 'door'});
           return dyn;
       }

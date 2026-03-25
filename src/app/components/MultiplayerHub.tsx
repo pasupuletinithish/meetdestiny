@@ -123,6 +123,10 @@ export const MultiplayerHub: React.FC = () => {
            setGameState(null);
            toast.error('The other player left the game.');
         })
+        .on('broadcast', { event: 'restart' }, (payload) => {
+             startGame(payload.payload.p1, payload.payload.p2, payload.payload.type);
+             toast('Rematch started! 🎮');
+        })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') setLoading(false);
         });
@@ -375,7 +379,7 @@ export const MultiplayerHub: React.FC = () => {
   }
 
   return (
-    <div style={{ height: '100dvh', background: 'linear-gradient(160deg, #f8fafc 0%, #e2e8f0 100%)', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto', overflowX: 'hidden' }}>
+    <div style={{ height: '100dvh', background: 'linear-gradient(160deg, #f8fafc 0%, #e2e8f0 100%)', display: 'flex', flexDirection: 'column', maxWidth: 900, margin: '0 auto', overflowX: 'hidden' }}>
       {iAmWinner && <Confetti width={width} height={height} recycle={false} numberOfPieces={800} gravity={0.15} initialVelocityY={20} />}
       
       {/* Header */}
@@ -464,9 +468,9 @@ export const MultiplayerHub: React.FC = () => {
             </AnimatePresence>
           </div>
         ) : (
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', paddingBottom: 20 }}>
             {/* IN-GAME RENDER */}
-            <div style={{ background: '#fff', borderRadius: 24, padding: '24px 16px', width: '100%', maxWidth: 400, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}>
+            <div style={{ background: '#fff', borderRadius: 24, padding: '16px', width: '100%', maxWidth: '100%', boxShadow: '0 8px 30px rgba(0,0,0,0.08)', flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20 }}>
                 {gameState?.type === 'connect4' ? <Circle fill="#ef4444" color="#fff" size={24} /> : gameState?.type === 'chess' ? <span style={{fontSize: 24, lineHeight: 1}}>♟️</span> : gameState?.type === 'dash' ? <span style={{fontSize: 24, lineHeight: 1}}>🚕</span> : gameState?.type === 'coop' ? <Users color="#8b5cf6" size={24} /> : gameState?.type === 'platformer' ? <span style={{fontSize: 24, lineHeight: 1}}>🏃‍♂️</span> : <Grid color="#0ea5e9" size={24} />}
                 <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', margin: 0 }}>
@@ -491,7 +495,7 @@ export const MultiplayerHub: React.FC = () => {
 
               {/* BOARDS */}
               {gameState?.type === 'tictactoe' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, background: '#e2e8f0', padding: 10, borderRadius: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, background: '#e2e8f0', padding: 10, borderRadius: 20, maxWidth: 500, margin: '0 auto', width: '100%' }}>
                   {gameState.board.map((cell: any, i: number) => (
                     <button
                       key={i} onClick={() => handleTicTacToeMove(i)} disabled={!!gameState.winner || !!cell}
@@ -504,7 +508,7 @@ export const MultiplayerHub: React.FC = () => {
               )}
 
               {gameState?.type === 'connect4' && (
-                <div style={{ background: '#2563eb', padding: 10, borderRadius: 16, boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.2)' }}>
+                <div style={{ background: '#2563eb', padding: 10, borderRadius: 16, boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.2)', maxWidth: 500, margin: '0 auto', width: '100%' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
                     {gameState.board.map((row: any, rIndex: number) => 
                       row.map((cell: any, cIndex: number) => (
@@ -525,7 +529,7 @@ export const MultiplayerHub: React.FC = () => {
               )}
 
               {gameState?.type === 'chess' && (
-                <div style={{ width: '100%', maxWidth: 360, margin: '0 auto', borderRadius: 8, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                <div style={{ width: '100%', maxWidth: 500, margin: '0 auto', borderRadius: 8, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
                   <Chessboard 
                     position={gameState.board} 
                     onPieceDrop={handleChessMove}
@@ -535,7 +539,7 @@ export const MultiplayerHub: React.FC = () => {
               )}
 
               {gameState?.type === 'dash' && (
-                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 16, border: '4px solid #e2e8f0', boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.05)' }}>
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 16, border: '4px solid #e2e8f0', boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.05)', maxWidth: 500, margin: '0 auto', width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                       <div style={{ fontSize: 24, fontWeight: 900, color: '#ef4444', background: '#fee2e2', padding: '4px 12px', borderRadius: 8 }}>🔴 {gameState.p1Score}</div>
                       <div style={{ fontSize: 13, fontWeight: 800, color: '#64748b', display: 'flex', alignItems: 'center' }}>First to 10 Wins</div>
@@ -569,14 +573,21 @@ export const MultiplayerHub: React.FC = () => {
               {gameState?.type === 'platformer' && (
                  <DestinyPlatformer currentUser={currentUser} gameState={gameState} setGameState={setGameState} channelRef={channelRef} />
               )}
+              
+              {gameState?.winner && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 12 }}>
+                      <button onClick={() => {
+                          startGame(gameState.p1, gameState.p2, gameState.type);
+                          channelRef.current?.send({
+                              type: 'broadcast', event: 'restart',
+                              payload: { p1: gameState.p1, p2: gameState.p2, type: gameState.type }
+                          });
+                      }} style={{ padding: '16px 40px', borderRadius: 30, background: '#10b981', color: '#fff', fontSize: 18, fontWeight: 900, border: 'none', cursor: 'pointer', boxShadow: '0 8px 24px rgba(16,185,129,0.4)' }}>
+                          PLAY AGAIN 🔄
+                      </button>
+                  </motion.div>
+              )}
             </div>
-            
-            <button onClick={() => {  
-                setGameActive(false); 
-                if(channelRef.current) channelRef.current.send({ type: 'broadcast', event: 'leave', payload: {} });
-              }} style={{ marginTop: 30, padding: '12px 24px', borderRadius: 20, background: '#fff', border: '2px solid #e2e8f0', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
-              Abandon Game
-            </button>
           </motion.div>
         )}
       </div>

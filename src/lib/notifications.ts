@@ -195,6 +195,6 @@ export const notify = {
       userId: toUserId,
       title: '🎮 Game Invite!',
       body: `${fromName} invited you to play ${gameName}`,
-      url: '/games',
+      url: '/lounge/games',
     }),
 };

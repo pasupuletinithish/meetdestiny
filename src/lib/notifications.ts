@@ -4,15 +4,22 @@ const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
 // Convert VAPID public key to Uint8Array
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const cleanBase64 = base64String.replace(/^["']|["']$/g, '').trim();
-  const padding = '='.repeat((4 - (cleanBase64.length % 4)) % 4);
-  const base64 = (cleanBase64 + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
+  try {
+    let cleanBase64 = base64String.replace(/^["']|["']$/g, '').trim();
+    if (cleanBase64.startsWith('VITE_VAPID_PUBLIC_KEY=')) {
+      cleanBase64 = cleanBase64.replace('VITE_VAPID_PUBLIC_KEY=', '');
+    }
+    const padding = '='.repeat((4 - (cleanBase64.length % 4)) % 4);
+    const base64 = (cleanBase64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  } catch (e: any) {
+    throw new Error(`Invalid VAPID Key Format: "${base64String}". Ensure you copied JUST the key value into Vercel, without quotes or "VITE_VAPID_PUBLIC_KEY=". Error: ${e.message}`);
   }
-  return outputArray;
 }
 
 // Check if push notifications are supported

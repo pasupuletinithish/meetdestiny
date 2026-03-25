@@ -1,4 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import webpush from 'npm:web-push@3.6.7'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,133 +8,90 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-async function searchWeb(query: string): Promise<string> {
+serve(async (req) => {
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
-    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DestinyApp/1.0)' }
-    })
-    const data = await response.json()
-    const results: string[] = []
-    if (data.Abstract) results.push(data.Abstract)
-    if (data.RelatedTopics?.length) {
-      data.RelatedTopics.slice(0, 5).forEach((topic: any) => {
-        if (topic.Text) results.push(topic.Text)
+    const { user_id, title, body, url } = await req.json()
+
+    if (!user_id || !title || !body) {
+      throw new Error('Missing required fields: user_id, title, body')
+    }
+
+    // Initialize Supabase Admin Client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase environment variables are missing')
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Verify user authorization passing from frontend
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+        status: 401, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       })
     }
-    return results.join('\n') || 'No results found'
-  } catch {
-    return 'Search failed'
-  }
-}
 
-async function extractRouteWithGroq(
-  vehicleNumber: string, searchResults: string,
-  numberType: string, operator: string,
-  fromHint?: string, toHint?: string
-): Promise<string | null> {
-  const groqApiKey = Deno.env.get('GROQ_API_KEY')!
-  const prompt = `You are an Indian transport data expert. Extract bus route information from these search results.
+    // Fetch the target user's push subscription from the database
+    const { data: record, error: subError } = await supabase
+      .from('push_subscriptions')
+      .select('subscription')
+      .eq('user_id', user_id)
+      .single()
 
-Vehicle number: "${vehicleNumber}"
-Number type: ${numberType}
-Likely operator: ${operator}
-${fromHint ? `User says from: ${fromHint}` : ''}
-${toHint ? `User says to: ${toHint}` : ''}
-
-Search results:
-${searchResults}
-
-Respond with ONLY valid JSON, no markdown:
-{
-  "vehicleNumber": "${vehicleNumber}",
-  "vehicleType": "bus",
-  "operator": "operator name",
-  "fromLocation": "origin city",
-  "toLocation": "destination city",
-  "departureTime": "HH:MM AM/PM",
-  "arrivalTime": "HH:MM AM/PM",
-  "durationMinutes": 120,
-  "stops": ["stop1", "stop2"],
-  "confidence": "high or medium or low",
-  "source": "source name"
-}`
-
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${groqApiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      max_tokens: 1000,
-      temperature: 0.1,
-      messages: [
-        { role: 'system', content: 'You are an Indian transport expert. Always respond with valid JSON only. No markdown, no explanation.' },
-        { role: 'user', content: prompt },
-      ],
-    }),
-  })
-
-  const data = await response.json()
-  return data.choices?.[0]?.message?.content || null
-}
-
-serve(async (req) => {
-  // ✅ Handle preflight FIRST — must return 200
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { status: 200, headers: corsHeaders })
-  }
-
-  try {
-    const { vehicleNumber, fromHint, toHint, searchQueries, operator, numberType } = await req.json()
-
-    const searchResults: string[] = []
-    for (const query of (searchQueries || []).slice(0, 3)) {
-      const result = await searchWeb(query)
-      if (result && result !== 'No results found' && result !== 'Search failed') {
-        searchResults.push(`Query: "${query}"\nResults: ${result}`)
-      }
-    }
-
-    if (fromHint && toHint) {
-      const hintResult = await searchWeb(`${operator} bus ${fromHint} to ${toHint} route schedule`)
-      if (hintResult && hintResult !== 'No results found') {
-        searchResults.push(hintResult)
-      }
-    }
-
-    const combined = searchResults.length > 0
-      ? searchResults.join('\n\n---\n\n')
-      : `No search results found for ${vehicleNumber}. Operator: ${operator}`
-
-    const groqResponse = await extractRouteWithGroq(vehicleNumber, combined, numberType, operator, fromHint, toHint)
-
-    if (!groqResponse) {
+    if (subError || !record || !record.subscription) {
       return new Response(
-        JSON.stringify({ error: 'AI could not process route data' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'User is not subscribed to push notifications', details: subError }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const jsonMatch = groqResponse.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return new Response(
-        JSON.stringify({ error: 'Could not parse route data' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const subscription = record.subscription
+
+    // Set up web-push VAPID details
+    const vapidPublic = Deno.env.get('VAPID_PUBLIC_KEY')
+    const vapidPrivate = Deno.env.get('VAPID_PRIVATE_KEY')
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@meetdestiny.online'
+
+    if (!vapidPublic || !vapidPrivate) {
+      throw new Error('VAPID keys (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY) are not set in the environment')
     }
 
-    const route = JSON.parse(jsonMatch[0])
-    return new Response(
-      JSON.stringify(route.error ? { error: route.error } : { route }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
 
-  } catch (err) {
+    // Construct push payload mapped for sw.js
+    const payload = JSON.stringify({
+      title,
+      body,
+      url: url || '/',
+      icon: '/meetdestiny-favicon.svg'
+    })
+
+    try {
+      // Send the notification via the native browser push service
+      await webpush.sendNotification(subscription, payload)
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    } catch (pushError: any) {
+      // If the subscription is no longer valid (e.g. user revoked permission), remove it
+      if (pushError.statusCode === 404 || pushError.statusCode === 410) {
+        await supabase.from('push_subscriptions').delete().eq('user_id', user_id)
+      }
+      throw pushError
+    }
+
+  } catch (err: any) {
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: err.message || err.toString() }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

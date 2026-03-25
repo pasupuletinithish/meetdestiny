@@ -5,8 +5,10 @@ import { Gamepad2, ArrowLeft, Loader2, Users, Check, X, Grid, Circle } from 'luc
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { notify } from '../../lib/notifications';
+import { Chess } from 'chess.js';
+import { Chessboard } from 'react-chessboard';
 
-type GameType = 'tictactoe' | 'connect4';
+type GameType = 'tictactoe' | 'connect4' | 'chess';
 
 interface TravelerData {
   id: string;
@@ -21,13 +23,14 @@ interface GameState {
   board: any;
   xIsNext: boolean;
   winner: string | 'draw' | null;
-  p1: string; // user_id of P1 (Red/X)
-  p2: string; // user_id of P2 (Yellow/O)
+  p1: string; // user_id of P1 (Red/X/White)
+  p2: string; // user_id of P2 (Yellow/O/Black)
 }
 
 const GAMES = [
   { id: 'connect4' as GameType, name: 'Connect 4', icon: <Circle size={22} color="#fff" fill="#ef4444" />, bg: 'linear-gradient(135deg, #ef4444, #dc2626)', desc: 'Travel Edition Drop Token' },
   { id: 'tictactoe' as GameType, name: 'Tic Tac Toe', icon: <Grid size={22} color="#0ea5e9" />, bg: 'linear-gradient(135deg, #e0f2fe, #bae6fd)', textColor: '#0369a1', desc: 'Classic 3x3 Grid Match' },
+  { id: 'chess' as GameType, name: 'Chess', icon: <span style={{fontSize: 22, lineHeight: 1}}>♟️</span>, bg: 'linear-gradient(135deg, #1e293b, #0f172a)', desc: 'Grandmaster Classic (FEN)' },
 ];
 
 export const MultiplayerHub: React.FC = () => {
@@ -38,7 +41,7 @@ export const MultiplayerHub: React.FC = () => {
   const [travelers, setTravelers] = useState<TravelerData[]>([]);
   
   // Hub States
-  const [selectedGame, setSelectedGame] = useState<GameType>('connect4');
+  const [selectedGame, setSelectedGame] = useState<GameType>('chess');
   const [incomingInvite, setIncomingInvite] = useState<{ from: string, name: string, gameType: GameType } | null>(null);
   const [sentInviteTo, setSentInviteTo] = useState<string | null>(null);
   
@@ -131,7 +134,9 @@ export const MultiplayerHub: React.FC = () => {
       type,
       board: type === 'tictactoe' 
         ? Array(9).fill(null) 
-        : Array(6).fill(null).map(() => Array(7).fill(null)),
+        : type === 'connect4'
+          ? Array(6).fill(null).map(() => Array(7).fill(null))
+          : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', // valid FEN string for chess
       xIsNext: true,
       winner: null,
       p1, p2
@@ -167,7 +172,7 @@ export const MultiplayerHub: React.FC = () => {
 
   // --- TIC TAC TOE LOGIC ---
   const handleTicTacToeMove = (index: number) => {
-    if (!gameState || gameState.winner || gameState.board[index]) return;
+    if (!gameState || gameState.winner || gameState.board[index] || gameState.type !== 'tictactoe') return;
     
     const isMyTurn = (gameState.xIsNext && gameState.p1 === currentUser.id) || (!gameState.xIsNext && gameState.p2 === currentUser.id);
     if (!isMyTurn) return;
@@ -188,7 +193,7 @@ export const MultiplayerHub: React.FC = () => {
 
   // --- CONNECT 4 LOGIC ---
   const handleConnect4Move = (col: number) => {
-    if (!gameState || gameState.winner) return;
+    if (!gameState || gameState.winner || gameState.type !== 'connect4') return;
     
     const isMyTurn = (gameState.xIsNext && gameState.p1 === currentUser.id) || (!gameState.xIsNext && gameState.p2 === currentUser.id);
     if (!isMyTurn) return;
@@ -210,7 +215,6 @@ export const MultiplayerHub: React.FC = () => {
     let winner = null;
     
     for (const [dr, dc] of dirs) {
-      // Check forward and backwards along the vector
       let count = 1;
       let r = playedRow + dr, c = col + dc;
       while (r >= 0 && r < 6 && c >= 0 && c < 7 && newBoard[r][c] === token) { count++; r+=dr; c+=dc; }
@@ -222,6 +226,38 @@ export const MultiplayerHub: React.FC = () => {
     if (!winner && newBoard.every((row: any) => row.every((cell: any) => cell !== null))) winner = 'draw';
 
     updateGame(newBoard, winner);
+  };
+
+  // --- CHESS LOGIC ---
+  const handleChessMove = (sourceSquare: string, targetSquare: string) => {
+    if (!gameState || gameState.winner || gameState.type !== 'chess') return false;
+    
+    const isMyTurn = (gameState.xIsNext && gameState.p1 === currentUser.id) || (!gameState.xIsNext && gameState.p2 === currentUser.id);
+    if (!isMyTurn) return false;
+
+    const game = new Chess(gameState.board);
+    
+    try {
+      const move = game.move({
+        from: sourceSquare,
+        to: targetSquare,
+        promotion: 'q',
+      });
+
+      if (move === null) return false;
+
+      let winner = null;
+      if (game.isCheckmate()) {
+        winner = gameState.xIsNext ? 'P1' : 'P2';
+      } else if (game.isDraw() || game.isStalemate() || game.isThreefoldRepetition() || game.isInsufficientMaterial()) {
+        winner = 'draw';
+      }
+
+      updateGame(game.fen(), winner);
+      return true;
+    } catch(e) {
+      return false;
+    }
   };
 
   const updateGame = (newBoard: any, winner: string | 'draw' | null) => {
@@ -237,6 +273,12 @@ export const MultiplayerHub: React.FC = () => {
     if (gameState?.winner === 'draw') return "It's a Draw!";
     if (gameState?.winner) return `${gameState.winner === 'P1' || gameState.winner === 'X' ? 'Player 1' : 'Player 2'} Wins! 🎉`;
     const isMyTurn = (gameState?.xIsNext && gameState?.p1 === currentUser?.id) || (!gameState?.xIsNext && gameState?.p2 === currentUser?.id);
+    
+    if (gameState?.type === 'chess') {
+        const myColor = gameState.p1 === currentUser?.id ? 'White' : 'Black';
+        return isMyTurn ? `🟢 Your Turn (${myColor})!` : `⏳ Waiting for opponent...`;
+    }
+    
     return isMyTurn ? "🟢 Your Turn!" : "⏳ Waiting for opponent...";
   };
 
@@ -273,20 +315,35 @@ export const MultiplayerHub: React.FC = () => {
         {!gameActive ? (
           <div>
             <h2 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 12px', color: '#1e293b' }}>Select a Game</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-              {GAMES.map(g => (
-                <motion.button key={g.id} whileTap={{ scale: 0.96 }} onClick={() => setSelectedGame(g.id)}
-                  style={{ 
-                    padding: 16, borderRadius: 16, border: selectedGame === g.id ? `2px solid ${g.textColor || '#fff'}` : '2px solid transparent',
-                    background: g.bg, color: g.textColor || '#fff', textAlign: 'left', cursor: 'pointer',
-                    boxShadow: selectedGame === g.id ? '0 8px 20px rgba(0,0,0,0.15)' : 'none', filter: selectedGame !== g.id ? 'grayscale(0)' : 'grayscale(0.7) opacity(0.8)',
-                    transition: 'all 0.2s'
-                  }}>
-                  {g.icon}
-                  <h3 style={{ fontSize: 15, fontWeight: 800, margin: '8px 0 2px' }}>{g.name}</h3>
-                  <p style={{ fontSize: 11, opacity: 0.9, margin: 0 }}>{g.desc}</p>
-                </motion.button>
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12, marginBottom: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {GAMES.slice(0, 2).map(g => (
+                  <motion.button key={g.id} whileTap={{ scale: 0.96 }} onClick={() => setSelectedGame(g.id)}
+                    style={{ 
+                      padding: 16, borderRadius: 16, border: selectedGame === g.id ? `2px solid ${g.textColor || '#fff'}` : '2px solid transparent',
+                      background: g.bg, color: g.textColor || '#fff', textAlign: 'left', cursor: 'pointer',
+                      boxShadow: selectedGame === g.id ? '0 8px 20px rgba(0,0,0,0.15)' : 'none', filter: selectedGame !== g.id ? 'grayscale(0.7) opacity(0.8)' : 'none',
+                      transition: 'all 0.2s'
+                    }}>
+                    {g.icon}
+                    <h3 style={{ fontSize: 15, fontWeight: 800, margin: '8px 0 2px' }}>{g.name}</h3>
+                    <p style={{ fontSize: 11, opacity: 0.9, margin: 0 }}>{g.desc}</p>
+                  </motion.button>
+                ))}
+              </div>
+              <motion.button key={GAMES[2].id} whileTap={{ scale: 0.96 }} onClick={() => setSelectedGame(GAMES[2].id)}
+                style={{ 
+                  padding: 16, borderRadius: 16, border: selectedGame === GAMES[2].id ? `2px solid ${GAMES[2].textColor || '#fff'}` : '2px solid transparent',
+                  background: GAMES[2].bg, color: GAMES[2].textColor || '#fff', textAlign: 'left', cursor: 'pointer',
+                  boxShadow: selectedGame === GAMES[2].id ? '0 8px 20px rgba(0,0,0,0.15)' : 'none', filter: selectedGame !== GAMES[2].id ? 'grayscale(0.7) opacity(0.8)' : 'none',
+                  transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 16
+                }}>
+                <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.1)', borderRadius: 12 }}>{GAMES[2].icon}</div>
+                <div>
+                  <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 2px' }}>{GAMES[2].name}</h3>
+                  <p style={{ fontSize: 11, opacity: 0.9, margin: 0 }}>{GAMES[2].desc}</p>
+                </div>
+              </motion.button>
             </div>
 
             <div style={{ background: '#fff', borderRadius: 20, padding: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: 20 }}>
@@ -338,19 +395,19 @@ export const MultiplayerHub: React.FC = () => {
             {/* IN-GAME RENDER */}
             <div style={{ background: '#fff', borderRadius: 24, padding: '24px 16px', width: '100%', maxWidth: 400, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20 }}>
-                {gameState?.type === 'connect4' ? <Circle fill="#ef4444" color="#fff" size={24} /> : <Grid color="#0ea5e9" size={24} />}
+                {gameState?.type === 'connect4' ? <Circle fill="#ef4444" color="#fff" size={24} /> : gameState?.type === 'chess' ? <span style={{fontSize: 24, lineHeight: 1}}>♟️</span> : <Grid color="#0ea5e9" size={24} />}
                 <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', margin: 0 }}>
-                  {gameState?.type === 'connect4' ? 'Connect 4' : 'Tic Tac Toe'}
+                  {gameState?.type === 'connect4' ? 'Connect 4' : gameState?.type === 'chess' ? 'Chess' : 'Tic Tac Toe'}
                 </h2>
               </div>
               
               {/* Scoreboard / Players */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, background: '#f8fafc', padding: 8, borderRadius: 16 }}>
-                <div style={{ background: gameState?.p1 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#ef4444' : '#0ea5e9', flex: 1, textAlign: 'center', boxShadow: gameState?.p1 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
-                  {gameState?.type === 'connect4' ? '🔴' : '❌'} {gameState?.p1 === currentUser?.id ? 'You' : 'Opponent'}
+                <div style={{ background: gameState?.p1 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#ef4444' : gameState?.type === 'chess' ? '#475569' : '#0ea5e9', flex: 1, textAlign: 'center', boxShadow: gameState?.p1 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
+                  {gameState?.type === 'connect4' ? '🔴' : gameState?.type === 'chess' ? '♔' : '❌'} {gameState?.p1 === currentUser?.id ? 'You' : 'Opponent'}
                 </div>
-                <div style={{ background: gameState?.p2 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#eab308' : '#f43f5e', flex: 1, textAlign: 'center', boxShadow: gameState?.p2 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
-                  {gameState?.type === 'connect4' ? '🟡' : '⭕'} {gameState?.p2 === currentUser?.id ? 'You' : 'Opponent'}
+                <div style={{ background: gameState?.p2 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#eab308' : gameState?.type === 'chess' ? '#0f172a' : '#f43f5e', flex: 1, textAlign: 'center', boxShadow: gameState?.p2 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
+                  {gameState?.type === 'connect4' ? '🟡' : gameState?.type === 'chess' ? '♚' : '⭕'} {gameState?.p2 === currentUser?.id ? 'You' : 'Opponent'}
                 </div>
               </div>
 
@@ -374,8 +431,8 @@ export const MultiplayerHub: React.FC = () => {
               )}
 
               {gameState?.type === 'connect4' && (
-                <div style={{ background: '#2563eb', padding: 10, borderRadius: 16, boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.2)' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+                <div style={{ background: '#2563eb', padding: 8, borderRadius: 16, boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.2)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
                     {gameState.board.map((row: any, rIndex: number) => 
                       row.map((cell: any, cIndex: number) => (
                         <button
@@ -393,7 +450,24 @@ export const MultiplayerHub: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {gameState?.type === 'chess' && (
+                <div style={{ width: '100%', maxWidth: 360, margin: '0 auto', borderRadius: 8, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                  <Chessboard 
+                    position={gameState.board} 
+                    onPieceDrop={handleChessMove}
+                    boardOrientation={gameState.p1 === currentUser?.id ? 'white' : 'black'}
+                  />
+                </div>
+              )}
             </div>
+            
+            <button onClick={() => { 
+                setGameActive(false); 
+                if(channelRef.current) channelRef.current.send({ type: 'broadcast', event: 'leave', payload: {} });
+              }} style={{ marginTop: 30, padding: '12px 24px', borderRadius: 20, background: '#fff', border: '2px solid #e2e8f0', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+              Abandon Game
+            </button>
           </div>
         )}
       </div>

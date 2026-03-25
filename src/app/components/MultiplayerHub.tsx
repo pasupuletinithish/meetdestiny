@@ -9,8 +9,9 @@ import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
+import { CoopEscape } from './CoopEscape';
 
-type GameType = 'tictactoe' | 'connect4' | 'chess' | 'dash';
+type GameType = 'tictactoe' | 'connect4' | 'chess' | 'dash' | 'coop';
 
 interface TravelerData {
   id: string;
@@ -33,6 +34,7 @@ interface GameState {
 
 const GAMES = [
   { id: 'dash' as GameType, name: 'Destiny Dash', icon: <span style={{fontSize: 22, lineHeight: 1}}>🚕</span>, bg: 'linear-gradient(135deg, #f59e0b, #d97706)', desc: 'Lightning Reflex Game' },
+  { id: 'coop' as GameType, name: 'Co-Op Escape', icon: <Users size={22} color="#fff" />, bg: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', desc: 'Interactive Platformer' },
   { id: 'connect4' as GameType, name: 'Connect 4', icon: <Circle size={22} color="#fff" fill="#ef4444" />, bg: 'linear-gradient(135deg, #ef4444, #dc2626)', desc: 'Travel Edition Drop Token' },
   { id: 'tictactoe' as GameType, name: 'Tic Tac Toe', icon: <Grid size={22} color="#0ea5e9" />, bg: 'linear-gradient(135deg, #e0f2fe, #bae6fd)', textColor: '#0369a1', desc: 'Classic 3x3 Grid Match' },
   { id: 'chess' as GameType, name: 'Chess', icon: <span style={{fontSize: 22, lineHeight: 1}}>♟️</span>, bg: 'linear-gradient(135deg, #1e293b, #0f172a)', desc: 'Grandmaster Classic (FEN)' },
@@ -152,7 +154,9 @@ export const MultiplayerHub: React.FC = () => {
           ? Array(6).fill(null).map(() => Array(7).fill(null))
           : type === 'chess' 
             ? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-            : generateDeterministicTarget(p1, p2),
+            : type === 'coop'
+              ? { p1Pos: {r:0, c:0}, p2Pos: {r:0, c:7}, btnA: false, btnB: false, p1Escaped: false, p2Escaped: false }
+              : generateDeterministicTarget(p1, p2),
       xIsNext: true,
       winner: null,
       p1, p2,
@@ -325,6 +329,7 @@ export const MultiplayerHub: React.FC = () => {
   };
 
   const getStatusMessage = () => {
+    if (gameState?.winner === 'COOP_WIN') return "You both escaped together! 🏆";
     if (gameState?.winner === 'draw') return "It's a Draw!";
     
     const p1Name = gameState?.p1 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p1)?.name || 'Opponent';
@@ -337,6 +342,7 @@ export const MultiplayerHub: React.FC = () => {
     }
 
     if (gameState?.type === 'dash') return "Tap the 🚕 before they do! First to 10 wins!";
+    if (gameState?.type === 'coop') return "Work together to press buttons and escape! 🤝";
     
     const isMyTurn = (gameState?.xIsNext && gameState?.p1 === currentUser?.id) || (!gameState?.xIsNext && gameState?.p2 === currentUser?.id);
     
@@ -406,8 +412,8 @@ export const MultiplayerHub: React.FC = () => {
                   </motion.button>
                 ))}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                {GAMES.slice(2, 4).map(g => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
+                {GAMES.slice(2, 5).map(g => (
                   <motion.button key={g.id} whileTap={{ scale: 0.96 }} onClick={() => setSelectedGame(g.id)}
                     style={{ 
                       padding: 16, borderRadius: 16, border: selectedGame === g.id ? `2px solid ${g.textColor || '#fff'}` : '2px solid transparent',
@@ -472,19 +478,19 @@ export const MultiplayerHub: React.FC = () => {
             {/* IN-GAME RENDER */}
             <div style={{ background: '#fff', borderRadius: 24, padding: '24px 16px', width: '100%', maxWidth: 400, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20 }}>
-                {gameState?.type === 'connect4' ? <Circle fill="#ef4444" color="#fff" size={24} /> : gameState?.type === 'chess' ? <span style={{fontSize: 24, lineHeight: 1}}>♟️</span> : gameState?.type === 'dash' ? <span style={{fontSize: 24, lineHeight: 1}}>🚕</span> : <Grid color="#0ea5e9" size={24} />}
+                {gameState?.type === 'connect4' ? <Circle fill="#ef4444" color="#fff" size={24} /> : gameState?.type === 'chess' ? <span style={{fontSize: 24, lineHeight: 1}}>♟️</span> : gameState?.type === 'dash' ? <span style={{fontSize: 24, lineHeight: 1}}>🚕</span> : gameState?.type === 'coop' ? <Users color="#8b5cf6" size={24} /> : <Grid color="#0ea5e9" size={24} />}
                 <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', margin: 0 }}>
-                  {gameState?.type === 'connect4' ? 'Connect 4' : gameState?.type === 'chess' ? 'Chess' : gameState?.type === 'dash' ? 'Destiny Dash' : 'Tic Tac Toe'}
+                  {gameState?.type === 'connect4' ? 'Connect 4' : gameState?.type === 'chess' ? 'Chess' : gameState?.type === 'dash' ? 'Destiny Dash' : gameState?.type === 'coop' ? 'Co-Op Escape' : 'Tic Tac Toe'}
                 </h2>
               </div>
               
               {/* Scoreboard / Players */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, background: '#f8fafc', padding: 8, borderRadius: 16 }}>
-                <div style={{ background: gameState?.p1 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#ef4444' : gameState?.type === 'chess' ? '#475569' : gameState?.type === 'dash' ? '#f59e0b' : '#0ea5e9', flex: 1, textAlign: 'center', boxShadow: gameState?.p1 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
-                  {gameState?.type === 'connect4' ? '🔴' : gameState?.type === 'chess' ? '♔' : gameState?.type === 'dash' ? 'P1' : '❌'} {gameState?.p1 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p1)?.name || 'Opponent'}
+                <div style={{ background: gameState?.p1 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#ef4444' : gameState?.type === 'chess' ? '#475569' : gameState?.type === 'dash' ? '#f59e0b' : gameState?.type === 'coop' ? '#3b82f6' : '#0ea5e9', flex: 1, textAlign: 'center', boxShadow: gameState?.p1 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
+                  {gameState?.type === 'connect4' ? '🔴' : gameState?.type === 'chess' ? '♔' : gameState?.type === 'dash' ? 'P1' : gameState?.type === 'coop' ? 'P1' : '❌'} {gameState?.p1 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p1)?.name || 'Opponent'}
                 </div>
-                <div style={{ background: gameState?.p2 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#eab308' : gameState?.type === 'chess' ? '#0f172a' : gameState?.type === 'dash' ? '#d97706' : '#f43f5e', flex: 1, textAlign: 'center', boxShadow: gameState?.p2 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
-                  {gameState?.type === 'connect4' ? '🟡' : gameState?.type === 'chess' ? '♚' : gameState?.type === 'dash' ? 'P2' : '⭕'} {gameState?.p2 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p2)?.name || 'Opponent'}
+                <div style={{ background: gameState?.p2 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#eab308' : gameState?.type === 'chess' ? '#0f172a' : gameState?.type === 'dash' ? '#d97706' : gameState?.type === 'coop' ? '#ef4444' : '#f43f5e', flex: 1, textAlign: 'center', boxShadow: gameState?.p2 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
+                  {gameState?.type === 'connect4' ? '🟡' : gameState?.type === 'chess' ? '♚' : gameState?.type === 'dash' ? 'P2' : gameState?.type === 'coop' ? 'P2' : '⭕'} {gameState?.p2 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p2)?.name || 'Opponent'}
                 </div>
               </div>
 
@@ -566,9 +572,13 @@ export const MultiplayerHub: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {gameState?.type === 'coop' && (
+                 <CoopEscape currentUser={currentUser} gameState={gameState} setGameState={setGameState} channelRef={channelRef} />
+              )}
             </div>
             
-            <button onClick={() => { 
+            <button onClick={() => {  
                 setGameActive(false); 
                 if(channelRef.current) channelRef.current.send({ type: 'broadcast', event: 'leave', payload: {} });
               }} style={{ marginTop: 30, padding: '12px 24px', borderRadius: 20, background: '#fff', border: '2px solid #e2e8f0', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>

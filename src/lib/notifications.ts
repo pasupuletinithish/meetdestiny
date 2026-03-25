@@ -118,12 +118,18 @@ export async function sendPushNotification({
 }): Promise<void> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    await supabase.functions.invoke('send-push-notification', {
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
       body: { user_id: userId, title, body, url },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
+    
+    if (error) {
+      console.error('Failed edge function delivery:', error.message || error);
+    } else {
+      console.log('Push sent successfully via Edge function:', data);
+    }
   } catch (err) {
-    console.error('Failed to send push notification:', err);
+    console.error('Failed to invoke push notification:', err);
   }
 }
 

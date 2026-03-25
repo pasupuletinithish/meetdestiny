@@ -189,4 +189,12 @@ export const notify = {
       body: `${fromName}: sent a message`,
       url: '/lounge',
     }),
+
+  gameInvite: (toUserId: string, fromName: string, gameName: string) =>
+    sendPushNotification({
+      userId: toUserId,
+      title: '🎮 Game Invite!',
+      body: `${fromName} invited you to play ${gameName}`,
+      url: '/games',
+    }),
 };

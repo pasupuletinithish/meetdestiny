@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
-import { MessageCircle, Users, MapPin, Radio, User as UserIcon, BellOff, Bell, Loader2, ChevronRight } from 'lucide-react';
+import { MessageCircle, Users, MapPin, Radio, User as UserIcon, BellOff, Bell, Loader2, ChevronRight, Gamepad2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { AdSlot } from './AdSlot';
@@ -155,6 +155,19 @@ export const Lounge: React.FC = () => {
       mutable: true,
       muted: mutedDest,
       muteAction: () => toggleMute('destination'),
+    },
+    {
+      id: 'games',
+      icon: <Gamepad2 style={{ width: 22, height: 22, color: '#fff' }} />,
+      title: 'Multiplayer Games',
+      subtitle: 'Play with co-travelers',
+      meta: 'Tic-Tac-Toe Live',
+      gradient: 'linear-gradient(135deg, #10b981, #047857)',
+      glow: 'rgba(16,185,129,0.2)',
+      badge: 0,
+      action: () => navigate('/lounge/games'),
+      mutable: false,
+      muted: false,
     },
   ];
 

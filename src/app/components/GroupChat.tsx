@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Send, Users, MapPin, Loader2, BellOff, Bell, Check, CheckCheck, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
+import { notify } from '../../lib/notifications';
 
 interface Message {
   id: string;
@@ -431,6 +432,22 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
     } else if (data) {
       setMessages(prev => prev.map(m => m.id === tempId ? { ...data, pending: false } : m));
       pendingIds.current.add(data.id);
+
+      // Notify other participants
+      const chatId = isGroup ? currentCheckin.vehicle_id : currentCheckin.to_location;
+      supabase
+        .from('checkins')
+        .select('user_id')
+        .eq(isGroup ? 'vehicle_id' : 'to_location', chatId)
+        .eq('is_active', true)
+        .neq('user_id', currentUserId)
+        .then(({ data: participants }) => {
+          if (participants) {
+            participants.forEach(p => {
+              notify.groupMessage(p.user_id, currentCheckin.name, chatTitle);
+            });
+          }
+        });
     }
 
     setSending(false);

@@ -181,4 +181,12 @@ export const notify = {
       body: `${fromName} sent you a message`,
       url: '/lounge',
     }),
+
+  groupMessage: (toUserId: string, fromName: string, groupName: string) =>
+    sendPushNotification({
+      userId: toUserId,
+      title: `📝 ${groupName}`,
+      body: `${fromName}: sent a message`,
+      url: '/lounge',
+    }),
 };

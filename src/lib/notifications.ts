@@ -20,13 +20,19 @@ export function isPushSupported(): boolean {
 }
 
 // Request permission and subscribe
-export async function subscribeToPush(): Promise<boolean> {
-  if (!isPushSupported()) return false;
+export async function subscribeToPush(): Promise<{ success: boolean; error?: string }> {
+  if (!isPushSupported()) return { success: false, error: 'Push not supported on this browser' };
 
   try {
+    if (!VAPID_PUBLIC_KEY) {
+      return { success: false, error: 'VITE_VAPID_PUBLIC_KEY is missing in your environment variables' };
+    }
+
     // Request permission
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return false;
+    if (permission !== 'granted') {
+      return { success: false, error: 'Permission denied. Please allow notifications in site settings.' };
+    }
 
     // Register service worker
     const registration = await navigator.serviceWorker.register('/sw.js');
@@ -40,17 +46,22 @@ export async function subscribeToPush(): Promise<boolean> {
 
     // Save subscription to Supabase
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
+    if (!user) return { success: false, error: 'You must be logged in to enable notifications.' };
 
-    await supabase.from('push_subscriptions').upsert({
+    const { error: dbError } = await supabase.from('push_subscriptions').upsert({
       user_id: user.id,
       subscription: subscription.toJSON(),
     }, { onConflict: 'user_id' });
 
-    return true;
-  } catch (err) {
+    if (dbError) {
+      console.error('Database save error:', dbError);
+      return { success: false, error: 'Failed to save subscription to database.' };
+    }
+
+    return { success: true };
+  } catch (err: any) {
     console.error('Push subscription failed:', err);
-    return false;
+    return { success: false, error: err.message || 'An unknown error occurred' };
   }
 }
 

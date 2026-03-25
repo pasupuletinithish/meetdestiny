@@ -35,12 +35,12 @@ export const NotificationSettings: React.FC = () => {
       setEnabled(false);
       toast.success('Push notifications disabled');
     } else {
-      const success = await subscribeToPush();
-      if (success) {
+      const result = await subscribeToPush();
+      if (result.success) {
         setEnabled(true);
         toast.success('Push notifications enabled! 🔔');
       } else {
-        toast.error('Failed to enable notifications. Please allow notifications in your browser settings.');
+        toast.error(`Failed to enable: ${result.error || 'Please allow notifications in your browser settings.'}`);
       }
     }
     setLoading(false);

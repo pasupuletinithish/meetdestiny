@@ -53,30 +53,30 @@ const LEVELS = [
       exit: {x: 380, y: 70, w: 40, h: 80, color: '#22c55e'},
       getDynamic: (a: boolean, b: boolean) => {
           let dyn = [];
-          if (!a) dyn.push({x: 620, y: 330, w: 20, h: 220, color: '#f59e0b', drawType: 'door'});
-          if (!b) dyn.push({x: 100, y: 130, w: 20, h: 220, color: '#3b82f6', drawType: 'door'});
+          if (!a) dyn.push({x: 600, y: 350, w: 180, h: 20, color: '#f59e0b', drawType: 'door'});
+          if (!b) dyn.push({x: 20, y: 350, w: 180, h: 20, color: '#3b82f6', drawType: 'door'});
           return dyn;
       }
   },
   // LEVEL 3: Trust Fall
   {
       startP1: { x: 50, y: 300 },
-      startP2: { x: 100, y: 300 },
+      startP2: { x: 50, y: 300 },
       walls: [
-          {x: 0, y: 350, w: 150, h: 250, color: '#334155'},
+          {x: 0, y: 350, w: 100, h: 250, color: '#334155'},
           {x: 350, y: 350, w: 100, h: 250, color: '#334155'},
-          {x: 650, y: 350, w: 150, h: 250, color: '#334155'},
+          {x: 700, y: 350, w: 100, h: 250, color: '#334155'},
           {x: 0, y: 0, w: 20, h: 600, color: '#334155'},
           {x: 780, y: 0, w: 20, h: 600, color: '#334155'},
       ],
       btnA: {x: 40, y: 340, w: 40, h: 10, color: '#fcd34d'},
       btnB: {x: 380, y: 340, w: 40, h: 10, color: '#93c5fd'},
-      btnC: {x: 680, y: 340, w: 40, h: 10, color: '#f87171'},
-      exit: {x: 730, y: 250, w: 40, h: 100, color: '#22c55e'},
+      btnC: {x: 740, y: 340, w: 40, h: 10, color: '#f87171'},
+      exit: {x: 740, y: 250, w: 40, h: 100, color: '#22c55e'},
       getDynamic: (a: boolean, b: boolean, c: boolean) => {
           let dyn = [];
-          if (a || b) dyn.push({x: 150, y: 350, w: 200, h: 20, color: '#fcd34d', drawType: 'bridge'});
-          if (b || c) dyn.push({x: 450, y: 350, w: 200, h: 20, color: '#93c5fd', drawType: 'bridge'});
+          if (a || b) dyn.push({x: 100, y: 350, w: 250, h: 20, color: '#fcd34d', drawType: 'bridge'});
+          if (b || c) dyn.push({x: 450, y: 350, w: 250, h: 20, color: '#93c5fd', drawType: 'bridge'});
           return dyn;
       }
   }

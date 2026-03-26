@@ -126,11 +126,20 @@ export const Lounge: React.FC = () => {
         <div style={{ marginBottom: 16 }}>
           <AdSlot />
         </div>
-        <h1 style={{ fontSize: 34, fontWeight: 700, margin: '0 0 12px', color: '#000', letterSpacing: '-0.5px' }}>Chats</h1>
-        
-        <div style={{ display: 'flex', background: '#e4e5e7', borderRadius: 10, padding: '8px 12px', alignItems: 'center', gap: 8 }}>
-           <Search style={{ width: 16, height: 16, color: '#8e8e93' }} />
-           <input type="text" placeholder="Search" style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 17, width: '100%', color: '#000' }} />
+        {/* Cool Radar Animation replacing Title & Search */}
+        <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#fff', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.02)', margin: '4px 0 8px' }}>
+          <motion.div style={{ position: 'absolute', width: 30, height: 30, borderRadius: '50%', border: '2px solid #007AFF' }}
+            animate={{ scale: [1, 4], opacity: [0.6, 0] }} transition={{ duration: 2.4, repeat: Infinity, ease: 'easeOut' }} />
+          <motion.div style={{ position: 'absolute', width: 30, height: 30, borderRadius: '50%', border: '2px solid #34B7F1' }}
+            animate={{ scale: [1, 4], opacity: [0.6, 0] }} transition={{ duration: 2.4, delay: 0.8, repeat: Infinity, ease: 'easeOut' }} />
+          <motion.div style={{ position: 'absolute', width: 30, height: 30, borderRadius: '50%', border: '2px solid #25D366' }}
+            animate={{ scale: [1, 4], opacity: [0.6, 0] }} transition={{ duration: 2.4, delay: 1.6, repeat: Infinity, ease: 'easeOut' }} />
+          <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.85)', padding: '6px 14px', borderRadius: 20, backdropFilter: 'blur(8px)', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
+            <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
+               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+            </motion.div>
+            <span style={{ fontSize: 12, fontWeight: 800, background: 'linear-gradient(90deg, #007AFF, #25D366)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '0.08em' }}>SCANNING HUB</span>
+          </div>
         </div>
       </div>
 

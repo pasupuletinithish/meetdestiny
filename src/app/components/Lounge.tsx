@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { MessageCircle, Users, MapPin, Radio, User as UserIcon, BellOff, Bell, Loader2, ChevronRight, Gamepad2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -191,63 +191,74 @@ export const Lounge: React.FC = () => {
       fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', width: '100%', position: 'relative',
     }}>
 
-      {/* Ambient blobs */}
-      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-        <motion.div style={{ position: 'absolute', width: 300, height: 300, top: '-10%', left: '-15%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,136,229,0.08) 0%, transparent 70%)' }}
-          animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 8, repeat: Infinity }} />
-        <motion.div style={{ position: 'absolute', width: 260, height: 260, bottom: '-8%', right: '-12%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,107,53,0.08) 0%, transparent 70%)' }}
-          animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 10, repeat: Infinity }} />
+      {/* Premium Ambient Background */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', opacity: 0.8 }}>
+        <motion.div style={{ position: 'absolute', width: 400, height: 400, top: '-10%', left: '-20%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,136,229,0.12) 0%, transparent 60%)', filter: 'blur(40px)' }}
+          animate={{ scale: [1, 1.2, 1], rotate: [0, 90, 0] }} transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }} />
+        <motion.div style={{ position: 'absolute', width: 350, height: 350, bottom: '-10%', right: '-15%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,107,53,0.12) 0%, transparent 60%)', filter: 'blur(40px)' }}
+          animate={{ scale: [1, 1.3, 1], rotate: [0, -90, 0] }} transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }} />
+        <motion.div style={{ position: 'absolute', width: 250, height: 250, top: '40%', left: '50%', transform: 'translate(-50%, -50%)', borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 60%)', filter: 'blur(30px)' }}
+          animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0.8, 0.5] }} transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }} />
       </div>
 
-      {/* ── HEADER ── */}
-      <div style={{ position: 'relative', zIndex: 20, flexShrink: 0, padding: '16px 20px 12px', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(30,136,229,0.08)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* ── PREMIUM HEADER ── */}
+      <div style={{ position: 'relative', zIndex: 20, flexShrink: 0, padding: '24px 24px 16px', background: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 100%)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)', borderBottom: '1px solid rgba(255,255,255,0.8)', boxShadow: '0 8px 32px rgba(0,0,0,0.03)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <motion.div
-            animate={{ rotate: [0, 8, -8, 0] }}
-            transition={{ duration: 3, repeat: Infinity }}
-            style={{ width: 40, height: 40, borderRadius: 13, background: 'linear-gradient(135deg, #1E88E5, #FF6B35)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(30,136,229,0.3)', flexShrink: 0 }}>
-            <MessageCircle style={{ width: 18, height: 18, color: '#fff' }} />
+            animate={{ rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            style={{ width: 48, height: 48, borderRadius: 16, background: 'linear-gradient(135deg, #1E88E5, #FF6B35)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(30,136,229,0.3), inset 0 2px 4px rgba(255,255,255,0.3)', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%)' }} />
+            <MessageCircle style={{ width: 22, height: 22, color: '#fff' }} />
           </motion.div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0, background: 'linear-gradient(90deg, #1E88E5, #FF6B35)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <h1 style={{ fontSize: 24, fontWeight: 900, margin: '0 0 2px', background: 'linear-gradient(90deg, #1E88E5, #FF6B35, #7c3aed)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shine 5s linear infinite' }}>
               The Lounge
             </h1>
-            <p style={{ fontSize: 11, color: '#64748b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {currentCheckin?.vehicle_id} · {currentCheckin?.from_location} → {currentCheckin?.to_location}
+            <p style={{ fontSize: 13, color: '#64748b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>
+              {currentCheckin?.vehicle_id} · <span style={{ opacity: 0.7 }}>{currentCheckin?.from_location} → {currentCheckin?.to_location}</span>
             </p>
           </div>
           {/* Live dot */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 20, padding: '4px 10px' }}>
-            <motion.div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }}
-              animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }} transition={{ duration: 2, repeat: Infinity }} />
-            <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Live</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 24, padding: '6px 12px', boxShadow: '0 2px 10px rgba(34,197,94,0.1)' }}>
+            <motion.div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }}
+              animate={{ scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+            <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Live</span>
           </div>
         </div>
 
         {/* Traveler avatar stack */}
         {travelers.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, background: 'rgba(255,255,255,0.4)', padding: '8px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.6)' }}>
             <div style={{ display: 'flex' }}>
               {travelers.slice(0, 5).map((t, i) => (
-                <div key={t.id} style={{
-                  width: 26, height: 26, borderRadius: '50%',
-                  marginLeft: i > 0 ? -8 : 0,
-                  background: t.avatar_url ? 'transparent' : `hsl(${(i * 60 + 210) % 360}, 70%, 50%)`,
-                  border: '2px solid white',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  zIndex: travelers.length - i, overflow: 'hidden',
-                }}>
+                <motion.div key={t.id} 
+                  whileHover={{ y: -4, scale: 1.1, zIndex: 10 }}
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    marginLeft: i > 0 ? -12 : 0,
+                    background: t.avatar_url ? 'transparent' : `linear-gradient(135deg, hsl(${(i * 60 + 210) % 360}, 70%, 60%), hsl(${(i * 60 + 210) % 360}, 70%, 40%))`,
+                    border: '2px solid white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: travelers.length - i, overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)', cursor: 'pointer'
+                  }}>
                   {t.avatar_url
                     ? <img src={t.avatar_url} alt={t.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{t.name.split(' ').map((n: string) => n[0]).join('')}</span>
+                    : <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>{t.name.split(' ').map((n: string) => n[0]).join('')}</span>
                   }
-                </div>
+                </motion.div>
               ))}
+              {travelers.length > 5 && (
+                <div style={{ width: 32, height: 32, borderRadius: '50%', marginLeft: -12, background: '#f1f5f9', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b' }}>+{travelers.length - 5}</span>
+                </div>
+              )}
             </div>
-            <span style={{ fontSize: 12, color: '#64748b' }}>
-              {travelers.length} fellow traveler{travelers.length !== 1 ? 's' : ''} online
+            <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>
+              <strong style={{ color: '#0f172a' }}>{travelers.length}</strong> fellow traveler{travelers.length !== 1 ? 's' : ''} online
             </span>
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -255,102 +266,115 @@ export const Lounge: React.FC = () => {
         <AdSlot />
       </div>
 
-      {/* ── CARDS ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', scrollbarWidth: 'none', position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* ── PREMIUM CARDS ── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 24px', scrollbarWidth: 'none', position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <style>{`
+          @keyframes shine { 0% { background-position: 200% center; } 100% { background-position: -200% center; } }
+          .premium-card:hover .arrow-icon { transform: translateX(4px); }
+        `}</style>
         {cards.map((card, index) => (
           <motion.div
             key={card.id}
-            initial={{ opacity: 0, y: 20 }}
+            className="premium-card"
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.08, duration: 0.4 }}
+            transition={{ delay: index * 0.1, duration: 0.5, type: 'spring', damping: 20 }}
+            whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={card.action}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', position: 'relative' }}
           >
             <div style={{
-              background: 'rgba(255,255,255,0.85)',
-              backdropFilter: 'blur(16px)',
-              border: '1.5px solid rgba(255,255,255,0.9)',
-              borderRadius: 18,
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.7) 100%)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: '1px solid rgba(255,255,255,0.8)',
+              borderTop: '1px solid rgba(255,255,255,1)',
+              borderLeft: '1px solid rgba(255,255,255,1)',
+              borderRadius: 24,
               overflow: 'hidden',
-              boxShadow: `0 4px 20px ${card.glow}`,
+              boxShadow: `0 12px 32px -8px ${card.glow}, inset 0 2px 8px rgba(255,255,255,0.5)`,
             }}>
-              {/* Colored top strip */}
-              <motion.div
-                style={{ height: 3, background: card.gradient }}
-                animate={{ opacity: [0.7, 1, 0.7] }}
-                transition={{ duration: 2, repeat: Infinity, delay: index * 0.5 }}
-              />
+              {/* Colored subtle highlight at top */}
+              <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: 2, background: card.gradient, opacity: 0.6, filter: 'blur(2px)' }} />
 
-              <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                {/* Icon */}
-                <motion.div
-                  animate={{ scale: [1, 1.05, 1] }}
-                  transition={{ duration: 2, repeat: Infinity, delay: index * 0.3 }}
-                  style={{ width: 48, height: 48, borderRadius: 15, background: card.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 4px 14px ${card.glow}`, flexShrink: 0 }}>
-                  {card.icon}
-                </motion.div>
+              <div style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                {/* Premium Icon Container */}
+                <div style={{ position: 'relative' }}>
+                  <motion.div
+                    animate={{ scale: [1, 1.03, 1] }}
+                    transition={{ duration: 3, repeat: Infinity, delay: index * 0.3 }}
+                    style={{ width: 56, height: 56, borderRadius: 18, background: card.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 16px ${card.glow}, inset 0 2px 4px rgba(255,255,255,0.3)`, flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 50%)' }} />
+                    <div style={{ position: 'relative', zIndex: 1 }}>{card.icon}</div>
+                  </motion.div>
+                </div>
 
                 {/* Text */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <p style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
                       {card.title}
-                    </p>
+                    </h3>
                     {card.badge > 0 && (
                       <motion.div
                         initial={{ scale: 0 }} animate={{ scale: 1 }}
                         transition={{ type: 'spring' }}
-                        style={{ background: '#FF6B35', borderRadius: 10, padding: '1px 7px', flexShrink: 0 }}>
-                        <span style={{ fontSize: 10, fontWeight: 800, color: '#fff' }}>{card.badge}</span>
+                        style={{ background: '#ef4444', borderRadius: 12, padding: '2px 8px', boxShadow: '0 2px 8px rgba(239,68,68,0.4)', border: '1px solid rgba(255,255,255,0.5)' }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>{card.badge} New</span>
                       </motion.div>
                     )}
                   </div>
-                  <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{card.subtitle}</p>
-                  <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0' }}>{card.meta}</p>
+                  <p style={{ fontSize: 13, color: '#475569', margin: '0 0 2px', fontWeight: 500 }}>{card.subtitle}</p>
+                  <p style={{ fontSize: 11, color: '#94a3b8', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{card.meta}</p>
                 </div>
 
-                {/* Right side */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  {/* Mute button */}
+                {/* Right side arrows & actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                   {card.mutable && (
                     <motion.button
-                      whileTap={{ scale: 0.85 }}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
                       onClick={e => { e.stopPropagation(); card.muteAction?.(); }}
-                      style={{ width: 32, height: 32, borderRadius: 10, border: 'none', cursor: 'pointer', background: card.muted ? 'rgba(148,163,184,0.12)' : 'rgba(30,136,229,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      style={{ width: 36, height: 36, borderRadius: 12, border: card.muted ? '1px solid rgba(148,163,184,0.3)' : '1px solid rgba(30,136,229,0.2)', cursor: 'pointer', background: card.muted ? 'rgba(241,245,249,0.8)' : 'rgba(239,246,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
                       {card.muted
-                        ? <BellOff style={{ width: 14, height: 14, color: '#94a3b8' }} />
-                        : <Bell style={{ width: 14, height: 14, color: '#1E88E5' }} />
+                        ? <BellOff style={{ width: 16, height: 16, color: '#94a3b8' }} />
+                        : <Bell style={{ width: 16, height: 16, color: '#1E88E5' }} />
                       }
                     </motion.button>
                   )}
-                  {/* Arrow */}
-                  <motion.div
-                    animate={{ x: [0, 3, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity, delay: index * 0.2 }}
-                    style={{ width: 28, height: 28, borderRadius: 8, background: card.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 8px ${card.glow}` }}>
-                    <ChevronRight style={{ width: 14, height: 14, color: '#fff' }} />
-                  </motion.div>
+                  <div className="arrow-icon" style={{ width: 32, height: 32, borderRadius: 12, background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(226,232,240,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', transition: 'transform 0.3s ease' }}>
+                    <ChevronRight style={{ width: 18, height: 18, color: '#64748b' }} />
+                  </div>
                 </div>
               </div>
 
               {/* Muted indicator */}
-              {card.muted && (
-                <div style={{ padding: '6px 16px', background: 'rgba(148,163,184,0.06)', borderTop: '1px solid rgba(148,163,184,0.1)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <BellOff style={{ width: 11, height: 11, color: '#94a3b8' }} />
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>Notifications muted</span>
-                </div>
-              )}
+              <AnimatePresence>
+                {card.muted && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                    style={{ background: 'rgba(241,245,249,0.8)', borderTop: '1px dashed rgba(203,213,225,0.5)', overflow: 'hidden' }}>
+                    <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <BellOff style={{ width: 12, height: 12, color: '#64748b' }} />
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Notifications paused for this chat</span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         ))}
 
         {/* Empty travelers note */}
         {travelers.length === 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
-            style={{ background: 'rgba(30,136,229,0.04)', border: '1.5px dashed rgba(30,136,229,0.15)', borderRadius: 14, padding: '12px 16px', textAlign: 'center' }}>
-            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-              👀 No other travelers yet — group & destination chats are ready!
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
+            style={{ background: 'linear-gradient(135deg, rgba(30,136,229,0.05), rgba(30,136,229,0.02))', border: '1.5px dashed rgba(30,136,229,0.2)', borderRadius: 20, padding: '20px', textAlign: 'center', marginTop: 8 }}>
+            <span style={{ fontSize: 24, display: 'block', marginBottom: 8 }}>👀</span>
+            <p style={{ fontSize: 14, color: '#475569', margin: 0, fontWeight: 600 }}>
+              No other travelers yet.
+            </p>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>
+              Group & destination chats are ready when they join!
             </p>
           </motion.div>
         )}

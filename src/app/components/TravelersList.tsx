@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, MessageCircle, Loader2, Radio, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Loader2, Radio, User as UserIcon, Gamepad2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface TravelerData {
@@ -170,7 +170,7 @@ export const TravelersList: React.FC = () => {
         {[
           { icon: <Radio style={{ width: 22, height: 22 }} />, label: 'Discover', action: () => navigate('/discovery') },
           { icon: <MessageCircle style={{ width: 22, height: 22 }} />, label: 'Lounge', active: true, action: () => navigate('/lounge') },
-          { icon: <UserIcon style={{ width: 22, height: 22 }} />, label: 'Profile', action: () => navigate('/profile') },
+          { icon: <Gamepad2 style={{ width: 22, height: 22 }} />, label: 'Activities', action: () => navigate('/activities') },
         ].map(item => (
           <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 20px', color: (item as any).active ? '#1E88E5' : '#94a3b8' }}>

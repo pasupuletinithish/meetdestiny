@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft, MapPin, Users, Check, Loader2,
-  Radio, MessageCircle, User as UserIcon, Navigation
+  Radio, MessageCircle, User as UserIcon, Navigation, Gamepad2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -329,7 +329,7 @@ export const NearbyStops: React.FC = () => {
           { icon: <Radio style={{ width: 22, height: 22 }} />, label: 'Discover', active: false, action: () => navigate('/discovery') },
           { icon: <MessageCircle style={{ width: 22, height: 22 }} />, label: 'Lounge', active: false, action: () => navigate('/lounge') },
           { icon: <Users style={{ width: 22, height: 22 }} />, label: 'Friends', active: false, action: () => navigate('/friends') },
-          { icon: <UserIcon style={{ width: 22, height: 22 }} />, label: 'Profile', active: false, action: () => navigate('/profile') },
+          { icon: <Gamepad2 style={{ width: 22, height: 22 }} />, label: 'Activities', active: false, action: () => navigate('/activities') },
         ].map(item => (
           <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 16px', color: '#94a3b8' }}>

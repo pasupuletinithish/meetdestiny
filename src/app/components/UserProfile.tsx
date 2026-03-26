@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft, Briefcase, MapPin, Bus, Zap, MessageCircle,
   Radio, User as UserIcon, LogOut, RefreshCw, Trash2,
-  Shield, ChevronRight, Loader2, Clock, Users
+  Shield, ChevronRight, Loader2, Clock, Users, Gamepad2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -441,7 +441,7 @@ export const UserProfile: React.FC = () => {
           { icon: <Radio style={{ width: 22, height: 22 }} />, label: 'Discover', active: false, action: () => navigate('/discovery') },
           { icon: <MessageCircle style={{ width: 22, height: 22 }} />, label: 'Lounge', active: false, action: () => navigate('/lounge') },
           { icon: <Users style={{ width: 22, height: 22 }} />, label: 'Friends', active: false, action: () => navigate('/friends') },
-          { icon: <UserIcon style={{ width: 22, height: 22 }} />, label: 'Profile', active: true, action: () => {} },
+          { icon: <Gamepad2 style={{ width: 22, height: 22 }} />, label: 'Activities', active: false, action: () => navigate('/activities') },
         ].map(item => (
           <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 20px', color: item.active ? '#1E88E5' : '#94a3b8' }}>

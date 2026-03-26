@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Users, Check, X, MessageCircle, Radio,
-  User as UserIcon, Loader2, UserPlus, Clock, Heart
+  User as UserIcon, Loader2, UserPlus, Clock, Heart, Gamepad2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -363,7 +363,7 @@ export const Friends: React.FC = () => {
           { icon: <Radio style={{ width: 22, height: 22 }} />, label: 'Discover', active: false, action: () => navigate('/discovery') },
           { icon: <MessageCircle style={{ width: 22, height: 22 }} />, label: 'Lounge', active: false, action: () => navigate('/lounge') },
           { icon: <Users style={{ width: 22, height: 22 }} />, label: 'Friends', active: true, badge: pendingCount, action: () => {} },
-          { icon: <UserIcon style={{ width: 22, height: 22 }} />, label: 'Profile', active: false, action: () => navigate('/profile') },
+          { icon: <Gamepad2 style={{ width: 22, height: 22 }} />, label: 'Activities', active: false, action: () => navigate('/activities') },
         ].map(item => (
           <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 16px', color: item.active ? '#1E88E5' : '#94a3b8', position: 'relative' }}>

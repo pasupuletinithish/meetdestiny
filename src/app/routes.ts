@@ -15,7 +15,9 @@ import { AdminPanel } from './components/AdminPanel';
 import { ContestPage } from './components/ContestPage';
 import { MultiplayerHub } from './components/MultiplayerHub';
 import { SyncMediaLounge } from './components/SyncMediaLounge';
+import { WindowScavenger } from './components/WindowScavenger';
 import { Leaderboard } from './components/Leaderboard';
+import { ActivitiesTab } from './components/ActivitiesTab';
 
 export const router = createBrowserRouter([
   { path: '/', Component: Login },
@@ -37,4 +39,5 @@ export const router = createBrowserRouter([
   { path: '/lounge/games', Component: MultiplayerHub },
   { path: '/lounge/watch-party', Component: SyncMediaLounge },
   { path: '/leaderboard', Component: Leaderboard },
+  { path: '/activities', Component: ActivitiesTab },
 ]);

@@ -49,12 +49,28 @@ const parseTimeToDate = (timeStr: string, dateStr?: string): Date | null => {
   } catch { return null; }
 };
 
+// ── FIXED: Correct check-in window logic ─────────────────────
+// canCheckIn = true when within 10 mins before departure OR during journey
+// tooLate = true when past arrival time
+// too early = more than 10 mins before departure
 const checkDepartureTime = (departureTime: Date, arrivalTime?: Date): { canCheckIn: boolean; minutesUntil: number; tooLate: boolean } => {
   const now = new Date();
   const diffMs = departureTime.getTime() - now.getTime();
   const diffMins = Math.floor(diffMs / 60000);
+
+  // Journey already ended — past arrival time
   const pastArrival = arrivalTime ? now > arrivalTime : false;
-  return { canCheckIn: diffMins <= 10 && !pastArrival, minutesUntil: diffMins, tooLate: pastArrival };
+  if (pastArrival) {
+    return { canCheckIn: false, minutesUntil: diffMins, tooLate: true };
+  }
+
+  // Too early — more than 10 mins before departure
+  if (diffMins > 10) {
+    return { canCheckIn: false, minutesUntil: diffMins, tooLate: false };
+  }
+
+  // ✅ Within window: 10 mins before OR during journey (diffMins is 0 or negative)
+  return { canCheckIn: true, minutesUntil: diffMins, tooLate: false };
 };
 
 const calculateExpiryFromArrival = (arrivalTimeStr: string, dateStr?: string, fallbackDurationMinutes?: number): string => {
@@ -235,6 +251,7 @@ export const CheckIn: React.FC = () => {
     return () => clearInterval(interval);
   }, [departureCheck]);
 
+  // ── FIXED: Bus departure check with overnight support ─────
   const checkBusDeparture = useCallback((bus: any, direction: 'forward' | 'return') => {
     const depTimeStr = direction === 'forward'
       ? (bus.forward_departure || bus.departure_time)
@@ -243,23 +260,32 @@ export const CheckIn: React.FC = () => {
     const depDate = parseTimeToDate(depTimeStr);
     if (!depDate) { setDepartureCheck({ canCheckIn: true, minutesUntil: 0, tooLate: false }); return; }
     const arrDate = bus.arrival_time ? parseTimeToDate(bus.arrival_time) : undefined;
+    // Fix overnight: if arrival appears before departure, add 1 day
+    if (arrDate && arrDate < depDate) arrDate.setDate(arrDate.getDate() + 1);
     const check = checkDepartureTime(depDate, arrDate || undefined);
     setDepartureCheck(check);
     if (check.tooLate) {
-      toast.error('❌ This bus has already arrived at destination!');
+      toast.error('❌ This bus has already completed its journey!');
     } else if (!check.canCheckIn) {
       const minsUntilOpen = check.minutesUntil - 10;
       const h = Math.floor(minsUntilOpen / 60); const m = minsUntilOpen % 60;
       toast.warning(`⏰ Too early! Check-in opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`}`);
+    } else if (check.minutesUntil < 0) {
+      toast.success('✅ Journey in progress — check in anytime!');
+    } else {
+      toast.success(`✅ Check-in open! Departure in ${check.minutesUntil} min`);
     }
   }, []);
 
+  // ── FIXED: Train departure check with overnight support ───
   const checkTrainDeparture = useCallback((data: any) => {
     const depTimeStr = data.DepartureTime || data.BoardingTime || data.ScheduledDeparture;
     if (!depTimeStr) { setDepartureCheck({ canCheckIn: true, minutesUntil: 0, tooLate: false }); return; }
     const depDate = parseTimeToDate(depTimeStr, data.DateOfJourney);
     if (!depDate) { setDepartureCheck({ canCheckIn: true, minutesUntil: 0, tooLate: false }); return; }
     const arrDate = data.DestinationArrival ? parseTimeToDate(data.DestinationArrival, data.DateOfJourney) : undefined;
+    // Fix overnight trains: if arrival < departure, it's next day
+    if (arrDate && depDate && arrDate < depDate) arrDate.setDate(arrDate.getDate() + 1);
     const check = checkDepartureTime(depDate, arrDate || undefined);
     setDepartureCheck(check);
     if (check.tooLate) toast.error('❌ This train has already arrived!');
@@ -613,10 +639,7 @@ export const CheckIn: React.FC = () => {
                   <DepartureBanner />
                   <GPSBanner />
 
-                  {/* ── TRAIN SUBMIT BUTTON — clickable even when blocked ── */}
-                  <Button
-                    type="submit"
-                    disabled={loading || !pnrData || !profession.trim() || !trainAIDuration}
+                  <Button type="submit" disabled={loading || !pnrData || !profession.trim() || !trainAIDuration}
                     className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#1E88E5] to-[#1565C0] text-white font-medium shadow-lg disabled:opacity-50 text-base">
                     {loading
                       ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span>
@@ -715,10 +738,7 @@ export const CheckIn: React.FC = () => {
                   <DepartureBanner />
                   <GPSBanner />
 
-                  {/* ── BUS SUBMIT BUTTON — clickable even when blocked ── */}
-                  <Button
-                    type="submit"
-                    disabled={loading || (!busData && !busNotFound) || !busAIDuration}
+                  <Button type="submit" disabled={loading || (!busData && !busNotFound) || !busAIDuration}
                     className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#FF6B35] to-[#E85A2B] text-white font-medium shadow-lg disabled:opacity-50 text-base">
                     {loading
                       ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />{gpsStatus === 'fetching' ? 'Verifying location...' : 'Checking in...'}</span>

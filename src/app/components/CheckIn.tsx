@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
@@ -9,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { WaitingGame } from './WaitingGame';
 import { AdSlot } from './AdSlot';
+import { LiveVehicleStatus } from './LiveVehicleStatus';
 
 type TabType = 'reserved-train' | 'reserved-bus' | 'route-match';
 
@@ -606,6 +608,8 @@ export const CheckIn: React.FC = () => {
                     </motion.div>
                   )}
 
+                  {pnrData && <LiveVehicleStatus vehicleId={pnrData.TrainNumber || pnr} />}
+
                   <DepartureBanner />
                   <GPSBanner />
 
@@ -679,6 +683,8 @@ export const CheckIn: React.FC = () => {
                       </div>
                     </motion.div>
                   )}
+
+                  {busData && boardingDirection && <LiveVehicleStatus vehicleId={busData.vehicle_number} />}
 
                   {/* Manual fallback */}
                   {busNotFound && (

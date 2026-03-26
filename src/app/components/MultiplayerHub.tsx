@@ -11,8 +11,9 @@ import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 import { CoopEscape } from './CoopEscape';
 import { DestinyPlatformer } from './DestinyPlatformer';
+import { WindowScavenger } from './WindowScavenger';
 
-type GameType = 'tictactoe' | 'connect4' | 'chess' | 'dash' | 'coop' | 'platformer';
+type GameType = 'tictactoe' | 'connect4' | 'chess' | 'dash' | 'coop' | 'platformer' | 'scavenger';
 
 interface TravelerData {
   id: string;
@@ -34,6 +35,7 @@ interface GameState {
 }
 
 const GAMES = [
+  { id: 'scavenger' as GameType, name: 'Window Scavenger', icon: <span style={{fontSize: 22, lineHeight: 1}}>📸</span>, bg: 'linear-gradient(135deg, #14b8a6, #0d9488)', desc: 'Co-op Real World Geo-Hunt' },
   { id: 'dash' as GameType, name: 'Destiny Dash', icon: <span style={{fontSize: 22, lineHeight: 1}}>🚕</span>, bg: 'linear-gradient(135deg, #f59e0b, #d97706)', desc: 'Lightning Reflex Game' },
   { id: 'coop' as GameType, name: 'Co-Op Escape', icon: <Users size={22} color="#fff" />, bg: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', desc: 'Interactive Platformer' },
   { id: 'platformer' as GameType, name: 'Destiny Heights', icon: <span style={{fontSize: 22, lineHeight: 1}}>🏃‍♂️</span>, bg: 'linear-gradient(135deg, #10b981, #059669)', desc: '2D Co-Op Platformer' },
@@ -164,7 +166,9 @@ export const MultiplayerHub: React.FC = () => {
               ? { p1Pos: {r:0, c:0}, p2Pos: {r:0, c:7}, btnA: false, btnB: false, p1Escaped: false, p2Escaped: false }
               : type === 'platformer'
                 ? { p1: {x: 100, y: 400}, p2: {x: 200, y: 400} }
-                : generateDeterministicTarget(p1, p2),
+                : type === 'scavenger'
+                  ? { foundItems: [] }
+                  : generateDeterministicTarget(p1, p2),
       xIsNext: true,
       winner: null,
       p1, p2,
@@ -352,6 +356,7 @@ export const MultiplayerHub: React.FC = () => {
     if (gameState?.type === 'dash') return "Tap the 🚕 before they do! First to 10 wins!";
     if (gameState?.type === 'coop') return "Work together to press buttons and escape! 🤝";
     if (gameState?.type === 'platformer') return "Jump, push, and slide to reach the exit! 🏃‍♂️💨";
+    if (gameState?.type === 'scavenger') return "Look out the window and spot these items together! 🔭";
     
     const isMyTurn = (gameState?.xIsNext && gameState?.p1 === currentUser?.id) || (!gameState?.xIsNext && gameState?.p2 === currentUser?.id);
     
@@ -472,19 +477,19 @@ export const MultiplayerHub: React.FC = () => {
             {/* IN-GAME RENDER */}
             <div style={{ background: '#fff', borderRadius: 24, padding: '16px', width: '100%', maxWidth: '100%', boxShadow: '0 8px 30px rgba(0,0,0,0.08)', flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20 }}>
-                {gameState?.type === 'connect4' ? <Circle fill="#ef4444" color="#fff" size={24} /> : gameState?.type === 'chess' ? <span style={{fontSize: 24, lineHeight: 1}}>♟️</span> : gameState?.type === 'dash' ? <span style={{fontSize: 24, lineHeight: 1}}>🚕</span> : gameState?.type === 'coop' ? <Users color="#8b5cf6" size={24} /> : gameState?.type === 'platformer' ? <span style={{fontSize: 24, lineHeight: 1}}>🏃‍♂️</span> : <Grid color="#0ea5e9" size={24} />}
+                {gameState?.type === 'connect4' ? <Circle fill="#ef4444" color="#fff" size={24} /> : gameState?.type === 'chess' ? <span style={{fontSize: 24, lineHeight: 1}}>♟️</span> : gameState?.type === 'dash' ? <span style={{fontSize: 24, lineHeight: 1}}>🚕</span> : gameState?.type === 'coop' ? <Users color="#8b5cf6" size={24} /> : gameState?.type === 'platformer' ? <span style={{fontSize: 24, lineHeight: 1}}>🏃‍♂️</span> : gameState?.type === 'scavenger' ? <span style={{fontSize: 24, lineHeight: 1}}>📸</span> : <Grid color="#0ea5e9" size={24} />}
                 <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', margin: 0 }}>
-                  {gameState?.type === 'connect4' ? 'Connect 4' : gameState?.type === 'chess' ? 'Chess' : gameState?.type === 'dash' ? 'Destiny Dash' : gameState?.type === 'coop' ? 'Co-Op Escape' : gameState?.type === 'platformer' ? 'Destiny Heights' : 'Tic Tac Toe'}
+                  {gameState?.type === 'connect4' ? 'Connect 4' : gameState?.type === 'chess' ? 'Chess' : gameState?.type === 'dash' ? 'Destiny Dash' : gameState?.type === 'coop' ? 'Co-Op Escape' : gameState?.type === 'platformer' ? 'Destiny Heights' : gameState?.type === 'scavenger' ? 'Window Scavenger' : 'Tic Tac Toe'}
                 </h2>
               </div>
               
               {/* Scoreboard / Players */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, background: '#f8fafc', padding: 8, borderRadius: 16 }}>
-                <div style={{ background: gameState?.p1 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#ef4444' : gameState?.type === 'chess' ? '#475569' : gameState?.type === 'dash' ? '#f59e0b' : (gameState?.type === 'coop' || gameState?.type === 'platformer') ? '#3b82f6' : '#0ea5e9', flex: 1, textAlign: 'center', boxShadow: gameState?.p1 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
-                  {gameState?.type === 'connect4' ? '🔴' : gameState?.type === 'chess' ? '♔' : gameState?.type === 'dash' ? 'P1' : (gameState?.type === 'coop' || gameState?.type === 'platformer') ? 'P1' : '❌'} {gameState?.p1 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p1)?.name || 'Opponent'}
+                <div style={{ background: gameState?.p1 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#ef4444' : gameState?.type === 'chess' ? '#475569' : gameState?.type === 'dash' ? '#f59e0b' : (gameState?.type === 'coop' || gameState?.type === 'platformer' || gameState?.type === 'scavenger') ? '#3b82f6' : '#0ea5e9', flex: 1, textAlign: 'center', boxShadow: gameState?.p1 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
+                  {gameState?.type === 'connect4' ? '🔴' : gameState?.type === 'chess' ? '♔' : gameState?.type === 'dash' ? 'P1' : (gameState?.type === 'coop' || gameState?.type === 'platformer' || gameState?.type === 'scavenger') ? 'P1' : '❌'} {gameState?.p1 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p1)?.name || 'Opponent'}
                 </div>
-                <div style={{ background: gameState?.p2 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#eab308' : gameState?.type === 'chess' ? '#0f172a' : gameState?.type === 'dash' ? '#d97706' : (gameState?.type === 'coop' || gameState?.type === 'platformer') ? '#ef4444' : '#f43f5e', flex: 1, textAlign: 'center', boxShadow: gameState?.p2 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
-                  {gameState?.type === 'connect4' ? '🟡' : gameState?.type === 'chess' ? '♚' : gameState?.type === 'dash' ? 'P2' : (gameState?.type === 'coop' || gameState?.type === 'platformer') ? 'P2' : '⭕'} {gameState?.p2 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p2)?.name || 'Opponent'}
+                <div style={{ background: gameState?.p2 === currentUser?.id ? '#fff' : 'transparent', padding: '8px 16px', borderRadius: 12, fontWeight: 800, color: gameState?.type === 'connect4' ? '#eab308' : gameState?.type === 'chess' ? '#0f172a' : gameState?.type === 'dash' ? '#d97706' : (gameState?.type === 'coop' || gameState?.type === 'platformer' || gameState?.type === 'scavenger') ? '#ef4444' : '#f43f5e', flex: 1, textAlign: 'center', boxShadow: gameState?.p2 === currentUser?.id ? '0 2px 8px rgba(0,0,0,0.05)' : 'none' }}>
+                  {gameState?.type === 'connect4' ? '🟡' : gameState?.type === 'chess' ? '♚' : gameState?.type === 'dash' ? 'P2' : (gameState?.type === 'coop' || gameState?.type === 'platformer' || gameState?.type === 'scavenger') ? 'P2' : '⭕'} {gameState?.p2 === currentUser?.id ? 'You' : travelers.find(t => t.user_id === gameState?.p2)?.name || 'Opponent'}
                 </div>
               </div>
 
@@ -572,6 +577,9 @@ export const MultiplayerHub: React.FC = () => {
               )}
               {gameState?.type === 'platformer' && (
                  <DestinyPlatformer currentUser={currentUser} gameState={gameState} setGameState={setGameState} channelRef={channelRef} />
+              )}
+              {gameState?.type === 'scavenger' && (
+                 <WindowScavenger currentUser={currentUser} gameState={gameState} setGameState={setGameState} channelRef={channelRef} />
               )}
               
               {gameState?.winner && (

@@ -169,6 +169,19 @@ export const Lounge: React.FC = () => {
       mutable: false,
       muted: false,
     },
+    {
+      id: 'watch-party',
+      icon: <Radio style={{ width: 22, height: 22, color: '#fff' }} />,
+      title: 'Sync Watch Party',
+      subtitle: 'Watch videos together',
+      meta: 'Live Sync',
+      gradient: 'linear-gradient(135deg, #ec4899, #be185d)',
+      glow: 'rgba(236,72,153,0.2)',
+      badge: 0,
+      action: () => navigate('/lounge/watch-party'),
+      mutable: false,
+      muted: false,
+    },
   ];
 
   return (

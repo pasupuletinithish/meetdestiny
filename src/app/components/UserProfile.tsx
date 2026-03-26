@@ -299,6 +299,34 @@ export const UserProfile: React.FC = () => {
             </motion.div>
           )}
 
+          {/* Badges / Milestones */}
+          {isOwnProfile && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+              style={{ background: 'rgba(255,255,255,0.8)', border: '1.5px solid rgba(255,255,255,0.95)', borderRadius: 16, padding: '13px', backdropFilter: 'blur(12px)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>Milestones</p>
+                <button onClick={() => navigate('/leaderboard')} style={{ fontSize: 10, color: '#1E88E5', background: 'rgba(30,136,229,0.1)', padding: '4px 8px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700 }}>
+                  Leaderboard
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+                {[
+                  { icon: '⭐', name: 'First Trip', color: '#10b981' },
+                  { icon: '🏆', name: 'Top 10%', color: '#f59e0b' },
+                  { icon: '🎮', name: 'Gamer', color: '#8b5cf6' },
+                  { icon: '🤝', name: 'Connector', color: '#0ea5e9' }
+                ].map((b, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 60 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: `${b.color}15`, border: `2px solid ${b.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                      {b.icon}
+                    </div>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b', textAlign: 'center', lineHeight: 1.1 }}>{b.name}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
           {/* Account warning */}
           {isOwnProfile && friendsCount === 0 && (
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}

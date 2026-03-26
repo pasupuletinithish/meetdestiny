@@ -69,6 +69,7 @@ export const DiscoveryHub: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<CheckinUser | null>(null);
   const [pingedUsers, setPingedUsers] = useState<Set<string>>(new Set());
   const [hasActiveJourney, setHasActiveJourney] = useState(false);
+  const [missedConnections, setMissedConnections] = useState<CheckinUser[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
   const [myScore, setMyScore] = useState(0);
   const [myRank, setMyRank] = useState<number | null>(null);
@@ -157,10 +158,15 @@ export const DiscoveryHub: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
       const checkin = await fetchCurrentCheckin();
 
       if (!checkin) {
         setHasActiveJourney(false);
+        if (user) {
+          const { data: pastCheckins } = await supabase.from('checkins').select('*').neq('user_id', user.id).eq('is_active', false).order('created_at', { ascending: false }).limit(6);
+          setMissedConnections(pastCheckins || []);
+        }
         setLoading(false);
         return;
       }
@@ -169,7 +175,7 @@ export const DiscoveryHub: React.FC = () => {
       setCurrentCheckin(checkin);
       const expiresAt = new Date(checkin.expires_at).getTime();
       setTimeRemaining(Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)));
-      const { data: { user } } = await supabase.auth.getUser();
+      
       if (!user) return;
       const users = await fetchNearbyUsers(checkin.vehicle_id, user.id);
       setNearbyUsers(users);
@@ -525,6 +531,35 @@ await supabase.functions.invoke('pick-winner', {
               style={{ width: '100%', maxWidth: 280, padding: '12px 24px', borderRadius: 14, fontSize: 13, fontWeight: 600, color: '#FF6B35', background: 'rgba(255,107,53,0.07)', border: '1.5px solid rgba(255,107,53,0.2)', cursor: 'pointer' }}>
               👤 My Profile
             </motion.button>
+
+            {/* Missed Connections Section */}
+            {missedConnections.length > 0 && (
+              <div style={{ marginTop: 32, width: '100%', textAlign: 'left' }}>
+                <h4 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                   <Users size={18} color="#1E88E5" /> Missed Connections
+                </h4>
+                <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 10, scrollbarWidth: 'none', margin: '0 -24px', paddingLeft: 24, paddingRight: 24 }}>
+                  {missedConnections.map(mu => (
+                    <motion.div key={mu.id} whileHover={{ scale: 1.02 }}
+                      style={{ minWidth: 140, background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(30,136,229,0.1)', padding: '16px 12px', borderRadius: 16, textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' }}>
+                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg, #1E88E5, #1565C0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', color: '#fff', fontWeight: 800, fontSize: 18, boxShadow: '0 2px 8px rgba(30,136,229,0.3)' }}>
+                        {mu.name[0]}
+                      </div>
+                      <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mu.name}</p>
+                      <p style={{ margin: '0 0 12px', fontSize: 10, color: '#64748b' }}>Route: {mu.vehicle_id}</p>
+                      <button onClick={async () => {
+                         const { data: { user } } = await supabase.auth.getUser();
+                         if (!user) return;
+                         await supabase.from('pings').insert({ from_user_id: user.id, to_user_id: mu.user_id, checkin_id: mu.id });
+                         toast.success(`Reconnect sent to ${mu.name}!`);
+                      }} style={{ width: '100%', padding: '8px', borderRadius: 10, border: 'none', background: 'rgba(30,136,229,0.1)', color: '#1E88E5', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                        Reconnect
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
         ) : filteredUsers.length === 0 ? (

@@ -14,6 +14,8 @@ import { NotifyMe } from './components/NotifyMe';
 import { AdminPanel } from './components/AdminPanel';
 import { ContestPage } from './components/ContestPage';
 import { MultiplayerHub } from './components/MultiplayerHub';
+import { SyncMediaLounge } from './components/SyncMediaLounge';
+import { Leaderboard } from './components/Leaderboard';
 
 export const router = createBrowserRouter([
   { path: '/', Component: Login },
@@ -33,4 +35,6 @@ export const router = createBrowserRouter([
   { path: '/admin', Component: AdminPanel },
   { path: '/contest', Component: ContestPage },
   { path: '/lounge/games', Component: MultiplayerHub },
+  { path: '/lounge/watch-party', Component: SyncMediaLounge },
+  { path: '/leaderboard', Component: Leaderboard },
 ]);

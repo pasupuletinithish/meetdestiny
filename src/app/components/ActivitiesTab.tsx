@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { Radio, MessageCircle, Users, Gamepad2 } from 'lucide-react';
+import { AdSlot } from './AdSlot';
 
 export const ActivitiesTab: React.FC = () => {
   const navigate = useNavigate();
@@ -36,7 +37,10 @@ export const ActivitiesTab: React.FC = () => {
       fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', width: '100%', position: 'relative',
     }}>
       {/* Header */}
-      <div style={{ position: 'relative', zIndex: 20, flexShrink: 0, padding: '24px 24px 16px', background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+      <div style={{ position: 'relative', zIndex: 20, flexShrink: 0, padding: '44px 24px 16px', background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+        <div style={{ marginBottom: 20 }}>
+          <AdSlot />
+        </div>
         <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0, color: '#0f172a' }}>
           Fun & Activities
         </h1>

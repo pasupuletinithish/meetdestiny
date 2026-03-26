@@ -121,13 +121,10 @@ export const Lounge: React.FC = () => {
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-      {/* iOS WhatsApp Header */}
-      <div style={{ padding: '24px 16px 12px', background: '#f6f6f6', borderBottom: '1px solid #ddd' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <span style={{ color: '#007AFF', fontSize: 17 }}>Edit</span>
-          <motion.button whileTap={{ opacity: 0.5 }} onClick={() => navigate('/profile')} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-             <UserIcon style={{ color: '#007AFF', width: 24, height: 24 }} />
-          </motion.button>
+      {/* Ad Space & WhatsApp Header */}
+      <div style={{ padding: '44px 16px 12px', background: '#f6f6f6', borderBottom: '1px solid #ddd' }}>
+        <div style={{ marginBottom: 16 }}>
+          <AdSlot />
         </div>
         <h1 style={{ fontSize: 34, fontWeight: 700, margin: '0 0 12px', color: '#000', letterSpacing: '-0.5px' }}>Chats</h1>
         
@@ -135,10 +132,6 @@ export const Lounge: React.FC = () => {
            <Search style={{ width: 16, height: 16, color: '#8e8e93' }} />
            <input type="text" placeholder="Search" style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 17, width: '100%', color: '#000' }} />
         </div>
-      </div>
-
-      <div style={{ padding: '0 16px', background: '#fff' }}>
-         <AdSlot />
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>

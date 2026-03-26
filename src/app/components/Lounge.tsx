@@ -272,97 +272,115 @@ export const Lounge: React.FC = () => {
           @keyframes shine { 0% { background-position: 200% center; } 100% { background-position: -200% center; } }
           .premium-card:hover .arrow-icon { transform: translateX(4px); }
         `}</style>
-        {cards.map((card, index) => (
-          <motion.div
-            key={card.id}
-            className="premium-card"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1, duration: 0.5, type: 'spring', damping: 20 }}
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={card.action}
-            style={{ cursor: 'pointer', position: 'relative' }}
-          >
-            <div style={{
-              background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.7) 100%)',
-              backdropFilter: 'blur(24px)',
-              WebkitBackdropFilter: 'blur(24px)',
-              border: '1px solid rgba(255,255,255,0.8)',
-              borderTop: '1px solid rgba(255,255,255,1)',
-              borderLeft: '1px solid rgba(255,255,255,1)',
-              borderRadius: 24,
-              overflow: 'hidden',
-              boxShadow: `0 12px 32px -8px ${card.glow}, inset 0 2px 8px rgba(255,255,255,0.5)`,
-            }}>
-              {/* Colored subtle highlight at top */}
-              <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: 2, background: card.gradient, opacity: 0.6, filter: 'blur(2px)' }} />
+        {[
+          { title: 'Conversations', icon: <MessageCircle style={{ width: 16, height: 16, color: '#64748b' }} />, items: cards.slice(0, 3) },
+          { title: 'Activities', icon: <Gamepad2 style={{ width: 16, height: 16, color: '#64748b' }} />, items: cards.slice(3) }
+        ].map((group, groupIdx) => (
+          <React.Fragment key={group.title}>
+            <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: groupIdx * 0.2 }}
+              style={{ padding: '0 8px', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 0, marginTop: groupIdx === 0 ? 0 : 16 }}>
+              {group.icon}
+              <h2 style={{ fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b', margin: 0 }}>
+                {group.title}
+              </h2>
+            </motion.div>
+            
+            {group.items.map((card, index) => {
+              const globalIndex = groupIdx === 0 ? index : index + 3;
+              return (
+                <motion.div
+                  key={card.id}
+                  className="premium-card"
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: globalIndex * 0.1, duration: 0.5, type: 'spring', damping: 20 }}
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={card.action}
+                  style={{ cursor: 'pointer', position: 'relative' }}
+                >
+                  <div style={{
+                    background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.7) 100%)',
+                    backdropFilter: 'blur(24px)',
+                    WebkitBackdropFilter: 'blur(24px)',
+                    border: '1px solid rgba(255,255,255,0.8)',
+                    borderTop: '1px solid rgba(255,255,255,1)',
+                    borderLeft: '1px solid rgba(255,255,255,1)',
+                    borderRadius: 24,
+                    overflow: 'hidden',
+                    boxShadow: `0 12px 32px -8px ${card.glow}, inset 0 2px 8px rgba(255,255,255,0.5)`,
+                  }}>
+                    {/* Colored subtle highlight at top */}
+                    <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: 2, background: card.gradient, opacity: 0.6, filter: 'blur(2px)' }} />
 
-              <div style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                {/* Premium Icon Container */}
-                <div style={{ position: 'relative' }}>
-                  <motion.div
-                    animate={{ scale: [1, 1.03, 1] }}
-                    transition={{ duration: 3, repeat: Infinity, delay: index * 0.3 }}
-                    style={{ width: 56, height: 56, borderRadius: 18, background: card.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 16px ${card.glow}, inset 0 2px 4px rgba(255,255,255,0.3)`, flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 50%)' }} />
-                    <div style={{ position: 'relative', zIndex: 1 }}>{card.icon}</div>
-                  </motion.div>
-                </div>
+                    <div style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                      {/* Premium Icon Container */}
+                      <div style={{ position: 'relative' }}>
+                        <motion.div
+                          animate={{ scale: [1, 1.03, 1] }}
+                          transition={{ duration: 3, repeat: Infinity, delay: globalIndex * 0.3 }}
+                          style={{ width: 56, height: 56, borderRadius: 18, background: card.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 16px ${card.glow}, inset 0 2px 4px rgba(255,255,255,0.3)`, flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)', position: 'relative', overflow: 'hidden' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 50%)' }} />
+                          <div style={{ position: 'relative', zIndex: 1 }}>{card.icon}</div>
+                        </motion.div>
+                      </div>
 
-                {/* Text */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
-                      {card.title}
-                    </h3>
-                    {card.badge > 0 && (
-                      <motion.div
-                        initial={{ scale: 0 }} animate={{ scale: 1 }}
-                        transition={{ type: 'spring' }}
-                        style={{ background: '#ef4444', borderRadius: 12, padding: '2px 8px', boxShadow: '0 2px 8px rgba(239,68,68,0.4)', border: '1px solid rgba(255,255,255,0.5)' }}>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>{card.badge} New</span>
-                      </motion.div>
-                    )}
-                  </div>
-                  <p style={{ fontSize: 13, color: '#475569', margin: '0 0 2px', fontWeight: 500 }}>{card.subtitle}</p>
-                  <p style={{ fontSize: 11, color: '#94a3b8', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{card.meta}</p>
-                </div>
+                      {/* Text */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
+                            {card.title}
+                          </h3>
+                          {card.badge > 0 && (
+                            <motion.div
+                              initial={{ scale: 0 }} animate={{ scale: 1 }}
+                              transition={{ type: 'spring' }}
+                              style={{ background: '#ef4444', borderRadius: 12, padding: '2px 8px', boxShadow: '0 2px 8px rgba(239,68,68,0.4)', border: '1px solid rgba(255,255,255,0.5)' }}>
+                              <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>{card.badge} New</span>
+                            </motion.div>
+                          )}
+                        </div>
+                        <p style={{ fontSize: 13, color: '#475569', margin: '0 0 2px', fontWeight: 500 }}>{card.subtitle}</p>
+                        <p style={{ fontSize: 11, color: '#94a3b8', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{card.meta}</p>
+                      </div>
 
-                {/* Right side arrows & actions */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                  {card.mutable && (
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={e => { e.stopPropagation(); card.muteAction?.(); }}
-                      style={{ width: 36, height: 36, borderRadius: 12, border: card.muted ? '1px solid rgba(148,163,184,0.3)' : '1px solid rgba(30,136,229,0.2)', cursor: 'pointer', background: card.muted ? 'rgba(241,245,249,0.8)' : 'rgba(239,246,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                      {card.muted
-                        ? <BellOff style={{ width: 16, height: 16, color: '#94a3b8' }} />
-                        : <Bell style={{ width: 16, height: 16, color: '#1E88E5' }} />
-                      }
-                    </motion.button>
-                  )}
-                  <div className="arrow-icon" style={{ width: 32, height: 32, borderRadius: 12, background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(226,232,240,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', transition: 'transform 0.3s ease' }}>
-                    <ChevronRight style={{ width: 18, height: 18, color: '#64748b' }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Muted indicator */}
-              <AnimatePresence>
-                {card.muted && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                    style={{ background: 'rgba(241,245,249,0.8)', borderTop: '1px dashed rgba(203,213,225,0.5)', overflow: 'hidden' }}>
-                    <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <BellOff style={{ width: 12, height: 12, color: '#64748b' }} />
-                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Notifications paused for this chat</span>
+                      {/* Right side arrows & actions */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                        {card.mutable && (
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={e => { e.stopPropagation(); card.muteAction?.(); }}
+                            style={{ width: 36, height: 36, borderRadius: 12, border: card.muted ? '1px solid rgba(148,163,184,0.3)' : '1px solid rgba(30,136,229,0.2)', cursor: 'pointer', background: card.muted ? 'rgba(241,245,249,0.8)' : 'rgba(239,246,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                            {card.muted
+                              ? <BellOff style={{ width: 16, height: 16, color: '#94a3b8' }} />
+                              : <Bell style={{ width: 16, height: 16, color: '#1E88E5' }} />
+                            }
+                          </motion.button>
+                        )}
+                        <div className="arrow-icon" style={{ width: 32, height: 32, borderRadius: 12, background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(226,232,240,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', transition: 'transform 0.3s ease' }}>
+                          <ChevronRight style={{ width: 18, height: 18, color: '#64748b' }} />
+                        </div>
+                      </div>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
+
+                    {/* Muted indicator */}
+                    <AnimatePresence>
+                      {card.muted && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                          style={{ background: 'rgba(241,245,249,0.8)', borderTop: '1px dashed rgba(203,213,225,0.5)', overflow: 'hidden' }}>
+                          <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <BellOff style={{ width: 12, height: 12, color: '#64748b' }} />
+                            <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Notifications paused for this chat</span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </React.Fragment>
         ))}
 
         {/* Empty travelers note */}

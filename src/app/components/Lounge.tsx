@@ -126,18 +126,21 @@ export const Lounge: React.FC = () => {
         <div style={{ marginBottom: 16 }}>
           <AdSlot />
         </div>
-        {/* 3D Person Meeting Animation integrated into header */}
+        {/* 3D Person Meeting & Hug Animation */}
         <div style={{ height: 75, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', margin: '8px 0 16px' }}>
            
            {/* Left Person (3D styled) */}
            <motion.div
-             animate={{ x: [-140, -90, -90, -140], opacity: [0, 1, 1, 0] }}
-             transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', times: [0, 0.33, 0.83, 1] }}
+             animate={{ 
+               x: [-140, -110, -15, -15, -15, -15, -15, -140], 
+               opacity: [0, 1, 1, 0, 0, 0, 0, 0] 
+             }}
+             transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
              style={{ position: 'absolute', zIndex: 2 }}
            >
               <motion.div
                  animate={{ y: [0, -8, 0] }}
-                 transition={{ duration: 0.6, repeat: Infinity, ease: 'easeInOut' }}
+                 transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut' }}
                  style={{ 
                    fontSize: 44, 
                    filter: 'drop-shadow(2px 10px 8px rgba(0,0,0,0.15)) drop-shadow(0 4px 4px rgba(0,0,0,0.1))',
@@ -150,13 +153,16 @@ export const Lounge: React.FC = () => {
 
            {/* Right Person (3D styled) */}
            <motion.div
-             animate={{ x: [140, 90, 90, 140], opacity: [0, 1, 1, 0] }}
-             transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', times: [0, 0.33, 0.83, 1] }}
+             animate={{ 
+               x: [140, 110, 15, 15, 15, 15, 15, 140], 
+               opacity: [0, 1, 1, 0, 0, 0, 0, 0] 
+             }}
+             transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
              style={{ position: 'absolute', zIndex: 2 }}
            >
               <motion.div
                  animate={{ y: [0, -8, 0] }}
-                 transition={{ duration: 0.6, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+                 transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut', delay: 0.25 }}
                  style={{ 
                    fontSize: 44, 
                    filter: 'drop-shadow(-2px 10px 8px rgba(0,0,0,0.15)) drop-shadow(0 4px 4px rgba(0,0,0,0.1))',
@@ -167,20 +173,37 @@ export const Lounge: React.FC = () => {
               </motion.div>
            </motion.div>
 
-           {/* App Name appearing upon meeting */}
+           {/* Hug Emoji */}
            <motion.div
              animate={{ 
-               scale: [0, 0, 1.2, 1, 1, 0], 
-               opacity: [0, 0, 1, 1, 1, 0] 
+               scale: [0.5, 0.5, 0.5, 1.2, 1, 0.5, 0.5, 0.5], 
+               opacity: [0, 0, 0, 1, 1, 0, 0, 0] 
              }}
-             transition={{ duration: 6, repeat: Infinity, times: [0, 0.31, 0.34, 0.37, 0.83, 1] }}
+             transition={{ duration: 6, repeat: Infinity, ease: 'easeOut', times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
+             style={{ 
+               position: 'absolute', 
+               zIndex: 3, 
+               fontSize: 50,
+               filter: 'drop-shadow(0 10px 10px rgba(0,0,0,0.2))'
+             }}
+           >
+             🫂
+           </motion.div>
+
+           {/* App Name appearing after hug */}
+           <motion.div
+             animate={{ 
+               scale: [0.8, 0.8, 0.8, 0.8, 0.8, 1.1, 1, 0.8], 
+               opacity: [0, 0, 0, 0, 0, 1, 1, 0] 
+             }}
+             transition={{ duration: 6, repeat: Infinity, ease: 'easeOut', times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
              style={{ 
                position: 'absolute', 
                zIndex: 3,
                background: 'linear-gradient(135deg, #1E88E5, #FF6B35)',
                WebkitBackgroundClip: 'text',
                WebkitTextFillColor: 'transparent',
-               fontSize: 27,
+               fontSize: 30,
                fontWeight: 900,
                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))',
                letterSpacing: '-0.5px'
@@ -189,11 +212,11 @@ export const Lounge: React.FC = () => {
              MeetDestiny
            </motion.div>
 
-           {/* Collision Impact / Sparkle */}
+           {/* Heart/Sparkle Explosion at Hug */}
            <motion.div
-             animate={{ scale: [0, 0, 2.5, 0], opacity: [0, 0, 0.8, 0] }}
-             transition={{ duration: 6, repeat: Infinity, times: [0, 0.31, 0.35, 0.5] }}
-             style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 60, height: 60, background: 'radial-gradient(circle, #FF6B35 0%, transparent 70%)', zIndex: 1, borderRadius: '50%' }}
+             animate={{ scale: [0, 0, 0, 1.5, 0, 0, 0, 0], opacity: [0, 0, 0, 0.8, 0, 0, 0, 0] }}
+             transition={{ duration: 6, repeat: Infinity, times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
+             style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 80, height: 80, background: 'radial-gradient(circle, #e11d48 0%, transparent 70%)', zIndex: 1, borderRadius: '50%' }}
            />
         </div>
       </div>

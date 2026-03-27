@@ -685,7 +685,20 @@ export const AdminPanel: React.FC = () => {
         {activeView === 'reports' && (
           <div className="space-y-4">
             {reports.length === 0 ? (
-              <div className="text-center py-12 text-slate-400"><Flag size={40} className="mx-auto mb-2 opacity-30" /><p className="text-sm">No reports yet</p></div>
+              <div className="text-center py-12 text-slate-400">
+                <Flag size={40} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm font-bold text-slate-600 mb-2">No reports yet, or database is misconfigured</p>
+                <div className="mt-6 max-w-sm mx-auto bg-orange-50 border border-orange-200 text-orange-800 p-4 rounded-xl text-left text-xs leading-relaxed">
+                  <p className="font-bold mb-1 flex items-center gap-1.5"><ShieldAlert size={14} /> Row-Level Security (RLS) Block</p>
+                  <p className="mb-3">If users are clicking "Report" but nothing appears here, your Supabase `reports` table is blocking inserts. Run this in your Supabase SQL Editor:</p>
+                  <div className="font-mono bg-white p-2.5 rounded-lg border border-orange-100 overflow-x-auto text-[10px] whitespace-pre">
+                    CREATE POLICY "allow_inserts"{'\n'}
+                    ON public.reports FOR INSERT{'\n'}
+                    TO authenticated{'\n'}
+                    WITH CHECK (auth.uid() = reporter_id);
+                  </div>
+                </div>
+              </div>
             ) : (
               reports.map(report => (
                 <motion.div key={report.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}

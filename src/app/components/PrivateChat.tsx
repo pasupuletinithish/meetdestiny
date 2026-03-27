@@ -169,6 +169,18 @@ export const PrivateChat: React.FC = () => {
     setMessageText('');
     setSending(true);
 
+    // ACTIVE PRE-FLIGHT BLOCK CHECK
+    const { data: isBlockedNow } = await supabase.from('blocked_users').select('id')
+      .or(`and(blocker_id.eq.${currentUserId},blocked_id.eq.${traveler.user_id}),and(blocker_id.eq.${traveler.user_id},blocked_id.eq.${currentUserId})`)
+      .limit(1);
+
+    if (isBlockedNow && isBlockedNow.length > 0) {
+      toast.error('Cannot send message to this user');
+      setIsBlocked(true);
+      setSending(false);
+      return;
+    }
+
     const tempId = `temp-${Date.now()}`;
     const optimisticMsg: Message = {
       id: tempId, from_user_id: currentUserId, to_user_id: traveler.user_id,

@@ -303,6 +303,18 @@ await supabase.functions.invoke('pick-winner', {
     setPingLoading(user.id);
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser || !currentCheckin) return;
+
+    // ACTIVE PRE-FLIGHT BLOCK CHECK
+    const { data: isBlocked } = await supabase.from('blocked_users').select('id')
+      .or(`and(blocker_id.eq.${authUser.id},blocked_id.eq.${user.user_id}),and(blocker_id.eq.${user.user_id},blocked_id.eq.${authUser.id})`)
+      .limit(1);
+    
+    if (isBlocked && isBlocked.length > 0) {
+      toast.error('Cannot interact with this user');
+      setPingLoading(null);
+      return;
+    }
+
     const { error } = await supabase.from('pings').insert({
       from_user_id: authUser.id, to_user_id: user.user_id, checkin_id: currentCheckin.id,
     });

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp, type VibeStatus } from '../context/AppContext';
 import { Switch } from './ui/switch';
-import { MessageCircle, User as UserIcon, EyeOff, Eye, Loader2, Zap, Radio, Users, MapPin, Shield, Flag, Ban, X, Trophy, Gamepad2 } from 'lucide-react';
+import { MessageCircle, User as UserIcon, EyeOff, Eye, Loader2, Zap, Radio, Users, MapPin, Shield, Flag, Ban, X, Trophy, Gamepad2, CheckCircle } from 'lucide-react';
 import { MutualMatchModal } from './MutualMatchModal';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -285,6 +285,28 @@ await supabase.functions.invoke('pick-winner', {
     if (!currentCheckin) return;
     supabase.from('checkins').update({ is_active: !invisibleMode }).eq('id', currentCheckin.id);
   }, [invisibleMode, currentCheckin]);
+
+  const handleReportUser = async () => {
+    if (!reportTarget || !reportReason) return;
+    setReportLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: user.id,
+      reported_id: reportTarget.user_id, // Ensure we send Auth ID not internal DB ID
+      reason: reportReason,
+      status: 'pending'
+    });
+
+    if (error) {
+      toast.error('Failed to submit report. Please try again.');
+    } else {
+      toast.success('Report submitted successfully. Our team will review it.');
+      setReportTarget(null);
+    }
+    setReportLoading(false);
+  };
 
   const handlePing = async (user: CheckinUser) => {
     if (pingedUsers.has(user.id)) { toast.info(`Already pinged ${user.name}`); return; }
@@ -741,6 +763,56 @@ await supabase.functions.invoke('pick-winner', {
       {matchedUser && (
         <MutualMatchModal open={showMatchModal} onClose={() => setShowMatchModal(false)} matchedUser={matchedUser} />
       )}
+
+      {/* ── REPORT MODAL ── */}
+      <AnimatePresence>
+        {reportTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}
+            onClick={() => setReportTarget(null)}>
+            <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              style={{ width: '100%', maxWidth: 480, background: '#fff', borderRadius: 24, padding: '24px', position: 'relative' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>Report User</h2>
+                <button onClick={() => setReportTarget(null)} style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer' }}>
+                  <X style={{ width: 20, height: 20, color: '#94a3b8' }} />
+                </button>
+              </div>
+
+              <div style={{ background: 'rgba(239,68,68,0.06)', borderRadius: 12, padding: '12px', display: 'flex', gap: 10, marginBottom: 20 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{reportTarget.name[0]}</span>
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: '0 0 2px' }}>{reportTarget.name}</p>
+                  <p style={{ fontSize: 11, color: '#ef4444', margin: 0 }}>You are reporting this user</p>
+                </div>
+              </div>
+
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 12 }}>Why are you reporting them?</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+                {REPORT_REASONS.map(reason => (
+                  <button key={reason} onClick={() => setReportReason(reason)}
+                    style={{ padding: '12px', borderRadius: 12, border: `1.5px solid ${reportReason === reason ? '#ef4444' : '#e2e8f0'}`, background: reportReason === reason ? 'rgba(239,68,68,0.04)' : '#fff', color: reportReason === reason ? '#ef4444' : '#64748b', fontSize: 13, fontWeight: 600, textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {reason}
+                    {reportReason === reason && <CheckCircle style={{ width: 16, height: 16, color: '#ef4444' }} />}
+                  </button>
+                ))}
+              </div>
+
+              <motion.button whileTap={{ scale: 0.97 }} onClick={handleReportUser}
+                disabled={!reportReason || reportLoading}
+                style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: !reportReason ? '#94a3b8' : '#ef4444', color: '#fff', fontSize: 15, fontWeight: 800, cursor: !reportReason ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {reportLoading && <Loader2 style={{ width: 18, height: 18 }} className="animate-spin" />}
+                Submit Report
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

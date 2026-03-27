@@ -68,10 +68,15 @@ export const Lounge: React.FC = () => {
         .eq('destination', checkin.to_location);
       setDestMessageCount(dCount || 0);
 
-      const { count: pCount } = await supabase
-        .from('private_messages').select('*', { count: 'exact', head: true })
+      const { data: blockedData } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', user.id);
+      const blockedSet = new Set(blockedData?.map(b => b.blocked_id) || []);
+
+      const { data: unreadMsgs } = await supabase
+        .from('private_messages').select('from_user_id')
         .eq('to_user_id', user.id).eq('is_seen', false);
-      setUnreadPrivate(pCount || 0);
+
+      const unreadCount = (unreadMsgs || []).filter(m => !blockedSet.has(m.from_user_id)).length;
+      setUnreadPrivate(unreadCount);
 
       setLoading(false);
     };

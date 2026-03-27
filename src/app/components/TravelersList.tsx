@@ -40,13 +40,17 @@ export const TravelersList: React.FC = () => {
 
       if (!checkin) { navigate('/check-in'); return; }
 
+      const { data: blockedData } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', user.id);
+      const blockedSet = new Set(blockedData?.map(b => b.blocked_id) || []);
+
       const { data: tvlrs } = await supabase
         .from('checkins').select('*')
         .eq('vehicle_id', checkin.vehicle_id)
         .eq('is_active', true)
         .neq('user_id', user.id);
 
-      setTravelers(tvlrs || []);
+      const filteredTvlrs = (tvlrs || []).filter(t => !blockedSet.has(t.user_id));
+      setTravelers(filteredTvlrs);
 
       // Get unread counts per traveler
       if (tvlrs && tvlrs.length > 0) {

@@ -230,8 +230,14 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
 
       const chatId = isGroup ? checkin.vehicle_id : checkin.to_location;
 
-      const { data: blocked } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', user.id);
-      const blockedSet = new Set(blocked?.map((b: any) => b.blocked_id) || []);
+      const { data: blocked } = await supabase.from('blocked_users').select('blocker_id, blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+      const blockedSet = new Set<string>();
+      if (blocked) {
+        blocked.forEach((b: any) => {
+          if (b.blocker_id === user.id) blockedSet.add(b.blocked_id);
+          if (b.blocked_id === user.id) blockedSet.add(b.blocker_id);
+        });
+      }
       setBlockedUsers(blockedSet);
 
       const { data: msgs } = await supabase
@@ -452,7 +458,9 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         .then(({ data: participants }) => {
           if (participants) {
             participants.forEach(p => {
-              notify.groupMessage(p.user_id, currentCheckin.name, chatTitle);
+              if (!blockedUsers.has(p.user_id)) {
+                notify.groupMessage(p.user_id, currentCheckin.name, chatTitle);
+              }
             });
           }
         });

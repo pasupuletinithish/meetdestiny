@@ -116,8 +116,15 @@ export const DiscoveryHub: React.FC = () => {
   const fetchBlockedUsers = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', user.id);
-    if (data) setBlockedUsers(new Set(data.map((b: any) => b.blocked_id)));
+    const { data } = await supabase.from('blocked_users').select('blocker_id, blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+    if (data) {
+      const blockedSet = new Set<string>();
+      data.forEach(d => {
+        if (d.blocker_id === user.id) blockedSet.add(d.blocked_id);
+        if (d.blocked_id === user.id) blockedSet.add(d.blocker_id);
+      });
+      setBlockedUsers(blockedSet);
+    }
   }, []);
 
   // ── Calculate live contest score ──────────────────────────

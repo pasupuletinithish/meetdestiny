@@ -13,52 +13,34 @@ for (const line of env.split('\n')) {
 const supabase = createClient(url, key);
 
 async function testInsertReport() {
-  console.log('Signing up dummy user...');
-  const email = `test_report_${Date.now()}@example.com`;
-  const { data: authData, error: authErr } = await supabase.auth.signUp({
-    email,
-    password: 'StrongPassword123!',
-    options: {
-      data: { full_name: 'Test Reporter' }
-    }
-  });
+  console.log('Signing in anonymously...');
+  const { data: authData, error: authErr } = await supabase.auth.signInAnonymously();
 
-  if (authErr && authErr.message !== 'User already registered') {
+  if (authErr) {
     console.error('Auth error:', authErr);
-    return;
+    // fallback just running it unauthenticated
+  } else {
+    console.log('Logged in anonymously as', authData.user?.id);
   }
 
-  const userId = authData.user?.id;
-  if (!userId) {
-    console.log('No user id');
-    return;
-  }
-  console.log('Logged in as', userId);
+  const userId = authData?.user?.id || '00000000-0000-0000-0000-000000000000';
 
-  const { data: profiles } = await supabase.from('user_profiles').select('user_id').limit(1);
-  const targetId = profiles?.length > 0 ? profiles[0].user_id : userId;
-
-  console.log(`Attempting to report user ${targetId}...`);
-  const { data, error } = await supabase.from('reports').insert({
+  console.log(`Attempting to report user...`);
+  const payload = {
     reporter_id: userId,
-    reported_id: targetId,
+    reported_id: '1cf51d94-4915-4f1e-aa01-4d396b635d82', // Arbitrary UUID
     reason: 'Testing RLS',
     context: 'Test script',
     status: 'pending'
-  });
+  };
+  
+  const { data, error } = await supabase.from('reports').insert(payload).select();
 
   if (error) {
-    console.error('Insert Error:', error);
+    console.error('Insert Error:', JSON.stringify(error, null, 2));
   } else {
     console.log('Insert Success. Data:', data);
   }
-
-  const { data: reportsData } = await supabase.from('reports').select('*');
-  console.log('Total reports:', reportsData?.length);
-
-  // Cleanup
-  console.log('Cleaning up...');
-  await supabase.from('reports').delete().eq('reporter_id', userId);
 }
 
 testInsertReport();

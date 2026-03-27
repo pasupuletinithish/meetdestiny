@@ -368,9 +368,9 @@ function LoginForm({
             {/* Terms */}
             <p className="text-xs text-gray-400 text-center leading-relaxed">
               By continuing, you agree to our{' '}
-              <span className="text-[#534AB7] hover:underline cursor-pointer">Terms</span>
+              <a href="/terms" className="text-[#534AB7] hover:underline cursor-pointer">Terms</a>
               {' & '}
-              <span className="text-[#534AB7] hover:underline cursor-pointer">Privacy Policy</span>
+              <a href="/privacy" className="text-[#534AB7] hover:underline cursor-pointer">Privacy Policy</a>
             </p>
           </motion.div>
         </div>

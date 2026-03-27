@@ -121,103 +121,31 @@ export const Lounge: React.FC = () => {
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-      {/* Ad Space & WhatsApp Header */}
-      <div style={{ padding: '44px 16px 12px', background: '#f6f6f6', borderBottom: '1px solid #ddd' }}>
-        <div style={{ marginBottom: 16 }}>
-          <AdSlot />
-        </div>
-        {/* 3D Person Meeting & Hug Animation */}
-        <div style={{ height: 75, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', margin: '8px 0 16px' }}>
-           
-           {/* Left Person (3D styled) */}
-           <motion.div
-             animate={{ 
-               x: [-140, -110, -15, -15, -15, -15, -15, -140], 
-               opacity: [0, 1, 1, 0, 0, 0, 0, 0] 
-             }}
-             transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
-             style={{ position: 'absolute', zIndex: 2 }}
-           >
-              <motion.div
-                 animate={{ y: [0, -8, 0] }}
-                 transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut' }}
-                 style={{ 
-                   fontSize: 44, 
-                   filter: 'drop-shadow(2px 10px 8px rgba(0,0,0,0.15)) drop-shadow(0 4px 4px rgba(0,0,0,0.1))',
-                   transform: 'rotate(5deg)'
-                 }}
-              >
-                 🚶‍♂️
-              </motion.div>
-           </motion.div>
-
-           {/* Right Person (3D styled) */}
-           <motion.div
-             animate={{ 
-               x: [140, 110, 15, 15, 15, 15, 15, 140], 
-               opacity: [0, 1, 1, 0, 0, 0, 0, 0] 
-             }}
-             transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
-             style={{ position: 'absolute', zIndex: 2 }}
-           >
-              <motion.div
-                 animate={{ y: [0, -8, 0] }}
-                 transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut', delay: 0.25 }}
-                 style={{ 
-                   fontSize: 44, 
-                   filter: 'drop-shadow(-2px 10px 8px rgba(0,0,0,0.15)) drop-shadow(0 4px 4px rgba(0,0,0,0.1))',
-                   transform: 'scaleX(-1) rotate(5deg)'
-                 }}
-              >
-                 🚶‍♀️
-              </motion.div>
-           </motion.div>
-
-           {/* Hug Emoji */}
-           <motion.div
-             animate={{ 
-               scale: [0.5, 0.5, 0.5, 1.2, 1, 0.5, 0.5, 0.5], 
-               opacity: [0, 0, 0, 1, 1, 0, 0, 0] 
-             }}
-             transition={{ duration: 6, repeat: Infinity, ease: 'easeOut', times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
-             style={{ 
-               position: 'absolute', 
-               zIndex: 3, 
-               fontSize: 50,
-               filter: 'drop-shadow(0 10px 10px rgba(0,0,0,0.2))'
-             }}
-           >
-             🫂
-           </motion.div>
-
-           {/* App Name appearing after hug */}
-           <motion.div
-             animate={{ 
-               scale: [0.8, 0.8, 0.8, 0.8, 0.8, 1.1, 1, 0.8], 
-               opacity: [0, 0, 0, 0, 0, 1, 1, 0] 
-             }}
-             transition={{ duration: 6, repeat: Infinity, ease: 'easeOut', times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
-             style={{ 
-               position: 'absolute', 
-               zIndex: 3,
-               background: 'linear-gradient(135deg, #1E88E5, #FF6B35)',
-               WebkitBackgroundClip: 'text',
-               WebkitTextFillColor: 'transparent',
-               fontSize: 30,
-               fontWeight: 900,
-               filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))',
-               letterSpacing: '-0.5px'
-             }}
-           >
-             MeetDestiny
-           </motion.div>
-
-           {/* Heart/Sparkle Explosion at Hug */}
-           <motion.div
-             animate={{ scale: [0, 0, 0, 1.5, 0, 0, 0, 0], opacity: [0, 0, 0, 0.8, 0, 0, 0, 0] }}
-             transition={{ duration: 6, repeat: Infinity, times: [0, 0.1, 0.33, 0.34, 0.5, 0.51, 0.9, 1] }}
-             style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 80, height: 80, background: 'radial-gradient(circle, #e11d48 0%, transparent 70%)', zIndex: 1, borderRadius: '50%' }}
-           />
+      {/* Premium iOS-style Header with Cool Logo Animation */}
+      <div style={{ padding: '52px 20px 16px', background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(0,0,0,0.08)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '34px', fontWeight: 800, letterSpacing: '-0.8px', color: '#000' }}>Chats</h1>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#8e8e93', fontWeight: 500 }}>MeetDestiny Network</p>
+          </div>
+          <motion.div
+            animate={{ 
+              boxShadow: [
+                '0 0 0px 0px rgba(0, 122, 255, 0)',
+                '0 0 20px 4px rgba(0, 122, 255, 0.15)',
+                '0 0 0px 0px rgba(0, 122, 255, 0)'
+              ]
+            }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ position: 'relative', width: 44, height: 44, borderRadius: '22px', background: 'linear-gradient(135deg, #007AFF, #5856D6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+              style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', border: '2px dashed rgba(255,255,255,0.3)', opacity: 0.8 }}
+            />
+            <Radio size={22} color="#fff" strokeWidth={2.5} />
+          </motion.div>
         </div>
       </div>
 
@@ -247,6 +175,11 @@ export const Lounge: React.FC = () => {
             </div>
           </motion.div>
         ))}
+      </div>
+
+      {/* Bottom AdSlot */}
+      <div style={{ padding: '16px', background: '#fff' }}>
+        <AdSlot />
       </div>
 
       {/* BOTTOM NAV */}

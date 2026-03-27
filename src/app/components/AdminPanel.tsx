@@ -245,9 +245,11 @@ export const AdminPanel: React.FC = () => {
     const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false });
     if (data) {
       const enriched = await Promise.all(data.map(async (r) => {
-        const { data: reporter } = await supabase.from('user_profiles').select('name').eq('user_id', r.reporter_id).maybeSingle();
-        const { data: reported } = await supabase.from('user_profiles').select('name').eq('user_id', r.reported_id).maybeSingle();
-        return { ...r, reporter: reporter || { name: 'Unknown' }, reported: reported || { name: 'Unknown' } };
+        let reporterName = await supabase.from('user_profiles').select('name').eq('user_id', r.reporter_id).maybeSingle().then(res => res.data?.name);
+        if (!reporterName) reporterName = await supabase.from('checkins').select('name').eq('user_id', r.reporter_id).order('created_at', { ascending: false }).limit(1).maybeSingle().then(res => res.data?.name);
+        let reportedName = await supabase.from('user_profiles').select('name').eq('user_id', r.reported_id).maybeSingle().then(res => res.data?.name);
+        if (!reportedName) reportedName = await supabase.from('checkins').select('name').eq('user_id', r.reported_id).order('created_at', { ascending: false }).limit(1).maybeSingle().then(res => res.data?.name);
+        return { ...r, reporter: { name: reporterName || 'Unknown User' }, reported: { name: reportedName || 'Unknown User' } };
       }));
       setReports(enriched);
     }
@@ -260,21 +262,33 @@ export const AdminPanel: React.FC = () => {
 
   const fetchWinners = async () => {
     const { data } = await supabase.from('contest_winners').select('*').order('created_at', { ascending: false }).limit(50);
-    setWinners(data || []);
+    if (data) {
+      const enriched = await Promise.all(data.map(async (w: any) => {
+        let name = w.winner_name;
+        if (!name && w.user_id) {
+          name = await supabase.from('user_profiles').select('name').eq('user_id', w.user_id).maybeSingle().then(res => res.data?.name);
+          if (!name) name = await supabase.from('checkins').select('name').eq('user_id', w.user_id).order('created_at', { ascending: false }).limit(1).maybeSingle().then(res => res.data?.name);
+        }
+        return { ...w, winner_name: name || 'Unknown User' };
+      }));
+      setWinners(enriched as ContestWinner[]);
+    } else {
+      setWinners([]);
+    }
   };
 
   const handleBan = async (userId: string, userName: string) => {
     setActionLoading(userId);
-    const { error } = await supabase.from('user_profiles').update({ is_banned: true, warn_count: 2 }).eq('id', userId);
-    if (!error) { setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_banned: true } : u)); toast.error(`${userName} has been banned.`); }
+    const { error } = await supabase.from('user_profiles').update({ is_banned: true, warn_count: 2 }).eq('user_id', userId);
+    if (!error) { setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, is_banned: true } : u)); toast.error(`${userName} has been banned.`); }
     else toast.error('Failed to ban user');
     setActionLoading(null);
   };
 
   const handleUnban = async (userId: string, userName: string) => {
     setActionLoading(userId);
-    const { data, error } = await supabase.from('user_profiles').update({ is_banned: false, warn_count: 0 }).eq('id', userId).select();
-    if (!error && data?.length > 0) { setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_banned: false, warn_count: 0 } : u)); toast.success(`${userName} has been unbanned! ✅`); }
+    const { data, error } = await supabase.from('user_profiles').update({ is_banned: false, warn_count: 0 }).eq('user_id', userId).select();
+    if (!error && data?.length > 0) { setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, is_banned: false, warn_count: 0 } : u)); toast.success(`${userName} has been unbanned! ✅`); }
     else toast.error('Failed to unban user');
     setActionLoading(null);
   };
@@ -650,11 +664,11 @@ export const AdminPanel: React.FC = () => {
                     <div>
                       {actionLoading === user.user_id ? <Loader2 size={20} className="animate-spin text-slate-400" />
                         : user.is_banned ? (
-                          <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleUnban(user.id, user.name)} className="flex items-center gap-1.5 px-3 py-2 bg-green-500 text-white text-xs font-bold rounded-xl shadow-sm">
+                          <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleUnban(user.user_id, user.name)} className="flex items-center gap-1.5 px-3 py-2 bg-green-500 text-white text-xs font-bold rounded-xl shadow-sm">
                             <ShieldCheck size={14} />Unban
                           </motion.button>
                         ) : (
-                          <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleBan(user.id, user.name)} className="flex items-center gap-1.5 px-3 py-2 bg-red-500 text-white text-xs font-bold rounded-xl shadow-sm">
+                          <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleBan(user.user_id, user.name)} className="flex items-center gap-1.5 px-3 py-2 bg-red-500 text-white text-xs font-bold rounded-xl shadow-sm">
                             <ShieldAlert size={14} />Ban
                           </motion.button>
                         )}

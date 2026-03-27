@@ -18,6 +18,8 @@ import { SyncMediaLounge } from './components/SyncMediaLounge';
 import { WindowScavenger } from './components/WindowScavenger';
 import { Leaderboard } from './components/Leaderboard';
 import { ActivitiesTab } from './components/ActivitiesTab';
+import { TermsAndConditions } from './components/TermsAndConditions';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
 
 export const router = createBrowserRouter([
   { path: '/', Component: Login },
@@ -40,4 +42,6 @@ export const router = createBrowserRouter([
   { path: '/lounge/watch-party', Component: SyncMediaLounge },
   { path: '/leaderboard', Component: Leaderboard },
   { path: '/activities', Component: ActivitiesTab },
+  { path: '/terms', Component: TermsAndConditions },
+  { path: '/privacy', Component: PrivacyPolicy },
 ]);

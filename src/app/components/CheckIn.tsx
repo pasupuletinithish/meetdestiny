@@ -84,8 +84,30 @@ const calculateExpiryFromArrival = (arrivalTimeStr: string, dateStr?: string, fa
   const now = new Date(); now.setMinutes(now.getMinutes() + (fallbackDurationMinutes || 360) + 60); return now.toISOString();
 };
 
-const calculateExpiryFromDuration = (durationMinutes: number): string => {
-  const now = new Date(); now.setMinutes(now.getMinutes() + durationMinutes + 60); return now.toISOString();
+const calculateExpiryFromDuration = (durationMinutes: number, departureTimeStr?: string): string => {
+  const now = new Date();
+  let baseDate = new Date(now);
+
+  if (departureTimeStr) {
+    const depDate = parseTimeToDate(departureTimeStr);
+    if (depDate) {
+      if (depDate.getTime() - now.getTime() > 12 * 60 * 60 * 1000) {
+        depDate.setDate(depDate.getDate() - 1);
+      }
+      baseDate = depDate;
+    }
+  }
+
+  const expDate = new Date(baseDate);
+  expDate.setMinutes(expDate.getMinutes() + durationMinutes + 60);
+
+  if (expDate < now) {
+    const fallback = new Date(now);
+    fallback.setMinutes(fallback.getMinutes() + durationMinutes + 60);
+    return fallback.toISOString();
+  }
+
+  return expDate.toISOString();
 };
 
 const getCurrentLocation = (): Promise<GPSResult | null> => new Promise(resolve => {
@@ -453,6 +475,8 @@ export const CheckIn: React.FC = () => {
     const fromLocation = boardingDirection === 'return' ? (busData?.to_location || manualFrom) : (busData?.from_location || manualFrom);
     const toLocation = boardingDirection === 'return' ? (busData?.from_location || manualTo) : (busData?.to_location || manualTo);
     const vehicleId = busData?.vehicle_number || busIdInput.trim() || `MANUAL-${Date.now()}`;
+    const depTimeStr = busData ? (boardingDirection === 'forward' ? (busData.forward_departure || busData.departure_time) : (busData.return_departure || busData.departure_time)) : undefined;
+
     if (!fromLocation || !toLocation) { toast.error('Please enter route details'); return; }
     if (!profession.trim()) { toast.error('Please enter your profession'); return; }
     if (!busAIDuration) { toast.error('Please wait for AI to calculate travel time'); return; }
@@ -462,8 +486,10 @@ export const CheckIn: React.FC = () => {
       if (!user) { navigate('/'); return; }
       const gpsOk = await verifyGPS(fromLocation, toLocation);
       if (!gpsOk) toast.warning('⚠️ You seem far from this route. Checking in anyway!');
-      const expiresAt = calculateExpiryFromDuration(busAIDuration);
-      const arrivalTime = new Date(expiresAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const expiresAt = calculateExpiryFromDuration(busAIDuration, depTimeStr);
+      const arrivalObj = new Date(expiresAt);
+      arrivalObj.setMinutes(arrivalObj.getMinutes() - 60);
+      const arrivalTime = arrivalObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
       const avatarUrl = userAvatar || await getUserAvatar(user.id);
       const { error } = await supabase.from('checkins').insert({ user_id: user.id, name: userName, profession, vehicle_id: vehicleId, from_location: fromLocation, to_location: toLocation, arrival_time: arrivalTime, expires_at: expiresAt, is_active: true, avatar_url: avatarUrl, gps_lat: gpsResult?.lat || null, gps_lng: gpsResult?.lng || null });
       if (error) throw error;
@@ -802,7 +828,12 @@ export const CheckIn: React.FC = () => {
           </div>
 
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-4 bg-white/60 backdrop-blur border border-white/40 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs text-gray-500 text-center">✨ <span className="font-medium text-gray-700">Safe travels!</span> Your check-in expires automatically when you reach your destination.</p>
+            <p className="text-xs text-gray-500 text-center mb-2">✨ <span className="font-medium text-gray-700">Safe travels!</span> Your check-in expires automatically when you reach your destination.</p>
+            <div className="flex justify-center items-center gap-3 text-xs text-gray-400">
+              <a href="/terms" className="hover:text-gray-600 transition-colors">Terms</a>
+              <span>•</span>
+              <a href="/privacy" className="hover:text-gray-600 transition-colors">Privacy</a>
+            </div>
           </motion.div>
         </motion.div>
       </div>

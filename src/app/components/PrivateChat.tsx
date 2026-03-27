@@ -89,13 +89,14 @@ export const PrivateChat: React.FC = () => {
         .eq('user_id', traveler.user_id).maybeSingle();
       setTravelerAvatar(theirProfile?.avatar_url || traveler.avatar_url || '');
 
-      // Check if already blocked
+      // Check if already blocked in either direction
       const { data: blockData } = await supabase
         .from('blocked_users').select('id')
-        .eq('blocker_id', user.id)
-        .eq('blocked_id', traveler.user_id)
-        .maybeSingle();
-      setIsBlocked(!!blockData);
+        .or(`and(blocker_id.eq.${user.id},blocked_id.eq.${traveler.user_id}),and(blocker_id.eq.${traveler.user_id},blocked_id.eq.${user.id})`)
+        .limit(1);
+      
+      const actuallyBlocked = !!(blockData && blockData.length > 0);
+      setIsBlocked(actuallyBlocked);
 
       const { data: msgs } = await supabase
         .from('private_messages').select('*')
@@ -128,7 +129,8 @@ export const PrivateChat: React.FC = () => {
           const isRelevant =
             (msg.from_user_id === currentUserId && msg.to_user_id === traveler.user_id) ||
             (msg.from_user_id === traveler.user_id && msg.to_user_id === currentUserId);
-          if (!isRelevant) return;
+          
+          if (!isRelevant || isBlocked) return;
           if (messageIds.current.has(msg.id)) {
             if (pendingIds.current.has(msg.id)) {
               pendingIds.current.delete(msg.id);
@@ -158,7 +160,7 @@ export const PrivateChat: React.FC = () => {
         })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [currentUserId, traveler, scrollToBottom]);
+  }, [currentUserId, traveler, scrollToBottom, isBlocked]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();

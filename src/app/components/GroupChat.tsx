@@ -154,6 +154,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
   const [isMuted, setIsMuted] = useState(false);
   const [warnCount, setWarnCount] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
   const [showWarnBanner, setShowWarnBanner] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -229,12 +230,17 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
 
       const chatId = isGroup ? checkin.vehicle_id : checkin.to_location;
 
+      const { data: blocked } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', user.id);
+      const blockedSet = new Set(blocked?.map((b: any) => b.blocked_id) || []);
+      setBlockedUsers(blockedSet);
+
       const { data: msgs } = await supabase
         .from(tableName).select('*')
         .eq(filterField, chatId)
         .or('is_flagged.eq.false,is_flagged.is.null')
         .order('created_at', { ascending: true });
-      setMessages(msgs || []);
+        
+      setMessages((msgs || []).filter(m => !blockedSet.has(m.user_id)));
 
       const { count } = await supabase
         .from('checkins').select('*', { count: 'exact', head: true })
@@ -299,6 +305,8 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         }
 
         // ── Incoming from OTHERS — moderate ──
+        if (blockedUsers.has(newMsg.user_id)) return;
+        
         if (isGroup) {
           console.log('🤖 Moderating incoming:', newMsg.text);
           const moderation = await moderateMessage(newMsg.text, newMsg.name, 0);
@@ -348,7 +356,7 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
       });
 
     return () => { supabase.removeChannel(channel); };
-  }, [currentCheckin, mode, isGroup, tableName, filterField, scrollToBottom, saveAIMessage]);
+  }, [currentCheckin, mode, isGroup, tableName, filterField, scrollToBottom, saveAIMessage, blockedUsers]);
 
   // ── Send with AI moderation ───────────────────────────────
   const handleSend = async (e: React.FormEvent) => {

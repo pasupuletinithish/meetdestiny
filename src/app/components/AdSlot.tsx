@@ -21,7 +21,11 @@ const ads = [
   }
 ];
 
-export const AdSlot: React.FC = () => {
+interface AdSlotProps {
+  variant?: 'default' | 'mini';
+}
+
+export const AdSlot: React.FC<AdSlotProps> = ({ variant = 'default' }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {

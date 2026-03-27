@@ -183,7 +183,7 @@ export const UserProfile: React.FC = () => {
         if (checkin) { setCurrentCheckin(checkin); setVibe(checkin.vibe || 'ready'); setTimeRemaining(Math.max(0, Math.floor((new Date(checkin.expires_at).getTime() - Date.now()) / 1000))); }
         const { data: profile } = await supabase.from('user_profiles').select('*').eq('user_id', user.id).maybeSingle();
         setProfileData(profile);
-        const { count } = await supabase.from('friends').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
+        const { count } = await supabase.from('friends').select('*', { count: 'exact', head: true }).or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`).eq('status', 'accepted');
         setFriendsCount(count || 0);
       } else {
         const { data: existingPing } = await supabase.from('pings').select('id').eq('from_user_id', user.id).eq('to_user_id', viewingCheckin!.user_id).maybeSingle();
@@ -234,7 +234,7 @@ export const UserProfile: React.FC = () => {
     try {
       await supabase.from('checkins').delete().eq('user_id', currentUserId);
       await supabase.from('pings').delete().eq('from_user_id', currentUserId);
-      await supabase.from('friends').delete().eq('user_id', currentUserId);
+      await supabase.from('friends').delete().or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`);
       await supabase.from('user_profiles').delete().eq('user_id', currentUserId);
       await supabase.from('lounge_messages').delete().eq('user_id', currentUserId);
       await supabase.from('private_messages').delete().eq('from_user_id', currentUserId);

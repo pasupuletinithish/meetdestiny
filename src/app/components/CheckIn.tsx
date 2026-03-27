@@ -458,10 +458,17 @@ export const CheckIn: React.FC = () => {
       const to = pnrData.Destination;
       const gpsOk = await verifyGPS(from, to);
       if (!gpsOk) toast.warning('⚠️ You seem far from this route. Checking in anyway!');
-      const expiresAt = calculateExpiryFromArrival(pnrData.DestinationArrival || '', pnrData.DateOfJourney, trainAIDuration);
-      const arrivalTime = pnrData.DestinationArrival || '11:59 PM';
+      let expiresAt = calculateExpiryFromArrival(pnrData.DestinationArrival || '', pnrData.DateOfJourney, trainAIDuration);
+      let arrivalTime = pnrData.DestinationArrival || '11:59 PM';
       const avatarUrl = userAvatar || await getUserAvatar(user.id);
       const vehicleId = pnrData.TrainNumber || pnr;
+
+      const { data: existingCheckin } = await supabase.from('checkins').select('expires_at, arrival_time').eq('vehicle_id', vehicleId).eq('is_active', true).limit(1).maybeSingle();
+      if (existingCheckin) {
+        expiresAt = existingCheckin.expires_at;
+        arrivalTime = existingCheckin.arrival_time;
+      }
+
       const { error } = await supabase.from('checkins').insert({ user_id: user.id, name: userName, profession, vehicle_id: vehicleId, from_location: from, to_location: to, arrival_time: arrivalTime, expires_at: expiresAt, is_active: true, avatar_url: avatarUrl, gps_lat: gpsResult?.lat || null, gps_lng: gpsResult?.lng || null });
       if (error) throw error;
       await createGroupRoom(vehicleId);
@@ -486,11 +493,18 @@ export const CheckIn: React.FC = () => {
       if (!user) { navigate('/'); return; }
       const gpsOk = await verifyGPS(fromLocation, toLocation);
       if (!gpsOk) toast.warning('⚠️ You seem far from this route. Checking in anyway!');
-      const expiresAt = calculateExpiryFromDuration(busAIDuration, depTimeStr);
+      let expiresAt = calculateExpiryFromDuration(busAIDuration, depTimeStr);
       const arrivalObj = new Date(expiresAt);
       arrivalObj.setMinutes(arrivalObj.getMinutes() - 60);
-      const arrivalTime = arrivalObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      let arrivalTime = arrivalObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
       const avatarUrl = userAvatar || await getUserAvatar(user.id);
+
+      const { data: existingCheckin } = await supabase.from('checkins').select('expires_at, arrival_time').eq('vehicle_id', vehicleId).eq('is_active', true).limit(1).maybeSingle();
+      if (existingCheckin) {
+        expiresAt = existingCheckin.expires_at;
+        arrivalTime = existingCheckin.arrival_time;
+      }
+
       const { error } = await supabase.from('checkins').insert({ user_id: user.id, name: userName, profession, vehicle_id: vehicleId, from_location: fromLocation, to_location: toLocation, arrival_time: arrivalTime, expires_at: expiresAt, is_active: true, avatar_url: avatarUrl, gps_lat: gpsResult?.lat || null, gps_lng: gpsResult?.lng || null });
       if (error) throw error;
       await createGroupRoom(vehicleId);
@@ -508,10 +522,20 @@ export const CheckIn: React.FC = () => {
       if (!user) { navigate('/'); return; }
       const gpsOk = await verifyGPS(routeFrom, routeTo);
       if (!gpsOk) toast.warning('⚠️ You seem far from this route. Checking in anyway!');
-      const expiresAt = calculateExpiryFromDuration(routeAnalysis.estimatedDurationMinutes);
+      let expiresAt = calculateExpiryFromDuration(routeAnalysis.estimatedDurationMinutes);
+      let arrivalTime = routeAnalysis.estimatedTime;
       const avatarUrl = userAvatar || await getUserAvatar(user.id);
-      const vehicleId = `ROUTE-${Date.now()}`;
-      const { error } = await supabase.from('checkins').insert({ user_id: user.id, name: userName, profession, vehicle_id: vehicleId, from_location: routeFrom.trim(), to_location: routeTo.trim(), arrival_time: routeAnalysis.estimatedTime, expires_at: expiresAt, is_active: true, avatar_url: avatarUrl, gps_lat: gpsResult?.lat || null, gps_lng: gpsResult?.lng || null });
+      // Generate a deterministic Route ID based on the corridor to allow matching!
+      const corridorHash = routeAnalysis.corridor.length > 1 ? `${routeAnalysis.corridor[0].substring(0,3).toUpperCase()}-${routeAnalysis.corridor[routeAnalysis.corridor.length-1].substring(0,3).toUpperCase()}` : `ROUTE-${Date.now()}`;
+      const vehicleId = `ROUTE-${corridorHash}`;
+
+      const { data: existingCheckin } = await supabase.from('checkins').select('expires_at, arrival_time').eq('vehicle_id', vehicleId).eq('is_active', true).limit(1).maybeSingle();
+      if (existingCheckin) {
+        expiresAt = existingCheckin.expires_at;
+        arrivalTime = existingCheckin.arrival_time;
+      }
+
+      const { error } = await supabase.from('checkins').insert({ user_id: user.id, name: userName, profession, vehicle_id: vehicleId, from_location: routeFrom.trim(), to_location: routeTo.trim(), arrival_time: arrivalTime, expires_at: expiresAt, is_active: true, avatar_url: avatarUrl, gps_lat: gpsResult?.lat || null, gps_lng: gpsResult?.lng || null });
       if (error) throw error;
       setCurrentUser({ name: userName, profession, vehicleId, from: routeFrom, to: routeTo, arrivalTime: routeAnalysis.estimatedTime });
       toast.success('Checked in! 🗺️'); navigate('/discovery');

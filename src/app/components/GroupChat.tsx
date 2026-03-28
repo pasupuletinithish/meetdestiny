@@ -455,10 +455,17 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
         .eq(isGroup ? 'vehicle_id' : 'to_location', chatId)
         .eq('is_active', true)
         .neq('user_id', currentUserId)
-        .then(({ data: participants }) => {
-          if (participants) {
+        .then(async ({ data: participants }) => {
+          if (participants && participants.length > 0) {
+            const { data: blockedNow } = await supabase.from('blocked_users').select('blocker_id, blocked_id').or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+            const blockedSetNow = new Set<string>();
+            blockedNow?.forEach((b: any) => {
+              if (b.blocker_id === currentUserId) blockedSetNow.add(b.blocked_id);
+              if (b.blocked_id === currentUserId) blockedSetNow.add(b.blocker_id);
+            });
+
             participants.forEach(p => {
-              if (!blockedUsers.has(p.user_id)) {
+              if (!blockedSetNow.has(p.user_id)) {
                 notify.groupMessage(p.user_id, currentCheckin.name, chatTitle);
               }
             });

@@ -695,7 +695,11 @@ export const AdminPanel: React.FC = () => {
                     CREATE POLICY "allow_inserts"{'\n'}
                     ON public.reports FOR INSERT{'\n'}
                     TO authenticated{'\n'}
-                    WITH CHECK (auth.uid() = reporter_id);
+                    WITH CHECK (auth.uid() = reporter_id);{'\n\n'}
+                    CREATE POLICY "allow_select"{'\n'}
+                    ON public.reports FOR SELECT{'\n'}
+                    TO authenticated{'\n'}
+                    USING (true);
                   </div>
                 </div>
               </div>

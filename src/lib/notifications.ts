@@ -142,13 +142,21 @@ export async function sendPushNotification({
 
 // Notification helpers for specific events
 export const notify = {
-  ping: (toUserId: string, fromName: string) =>
-    sendPushNotification({
+  ping: async (toUserId: string, fromName: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const { data: blockRecords } = await supabase.from('blocked_users').select('id')
+        .or(`and(blocker_id.eq.${session.user.id},blocked_id.eq.${toUserId}),and(blocker_id.eq.${toUserId},blocked_id.eq.${session.user.id})`)
+        .limit(1);
+      if (blockRecords && blockRecords.length > 0) return;
+    }
+    return sendPushNotification({
       userId: toUserId,
       title: '👋 New Ping!',
       body: `${fromName} pinged you on Destiny`,
       url: '/discovery',
-    }),
+    });
+  },
 
   newTraveler: (toUserId: string, name: string, vehicleId: string) =>
     sendPushNotification({
@@ -182,13 +190,21 @@ export const notify = {
       url: '/safety-sos',
     }),
 
-  message: (toUserId: string, fromName: string) =>
-    sendPushNotification({
+  message: async (toUserId: string, fromName: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const { data: blockRecords } = await supabase.from('blocked_users').select('id')
+        .or(`and(blocker_id.eq.${session.user.id},blocked_id.eq.${toUserId}),and(blocker_id.eq.${toUserId},blocked_id.eq.${session.user.id})`)
+        .limit(1);
+      if (blockRecords && blockRecords.length > 0) return;
+    }
+    return sendPushNotification({
       userId: toUserId,
       title: '💬 New Message',
       body: `${fromName} sent you a message`,
       url: '/lounge',
-    }),
+    });
+  },
 
   groupMessage: (toUserId: string, fromName: string, groupName: string) =>
     sendPushNotification({

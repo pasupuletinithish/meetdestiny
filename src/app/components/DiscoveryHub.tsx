@@ -304,12 +304,21 @@ await supabase.functions.invoke('pick-winner', {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser || !currentCheckin) return;
 
+    // Check if I am banned
+    const { data: profile } = await supabase.from('user_profiles').select('is_banned').eq('user_id', authUser.id).maybeSingle();
+    if (profile?.is_banned) {
+      toast.error('Your account is banned.');
+      setPingLoading(null);
+      return;
+    }
+
     // ACTIVE PRE-FLIGHT BLOCK CHECK
-    const { data: isBlocked } = await supabase.from('blocked_users').select('id')
-      .or(`and(blocker_id.eq.${authUser.id},blocked_id.eq.${user.user_id}),and(blocker_id.eq.${user.user_id},blocked_id.eq.${authUser.id})`)
-      .limit(1);
+    const { data: blockRecords } = await supabase.from('blocked_users').select('blocker_id, blocked_id')
+      .or(`blocker_id.eq.${authUser.id},blocked_id.eq.${authUser.id}`);
     
-    if (isBlocked && isBlocked.length > 0) {
+    const isBlocked = blockRecords?.some(b => b.blocker_id === user.user_id || b.blocked_id === user.user_id);
+    
+    if (isBlocked) {
       toast.error('Cannot interact with this user');
       setPingLoading(null);
       return;

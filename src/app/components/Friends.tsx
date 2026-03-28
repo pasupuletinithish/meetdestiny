@@ -49,6 +49,14 @@ export const Friends: React.FC = () => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
+
+      const { data: profile } = await supabase.from('user_profiles').select('is_banned').eq('user_id', user.id).maybeSingle();
+      if (profile?.is_banned) {
+        toast.error('Your account is banned.');
+        navigate('/');
+        return;
+      }
+
       setCurrentUserId(user.id);
       await fetchFriends(user.id);
       setLoading(false);

@@ -169,12 +169,22 @@ export const PrivateChat: React.FC = () => {
     setMessageText('');
     setSending(true);
 
-    // ACTIVE PRE-FLIGHT BLOCK CHECK
-    const { data: isBlockedNow } = await supabase.from('blocked_users').select('id')
-      .or(`and(blocker_id.eq.${currentUserId},blocked_id.eq.${traveler.user_id}),and(blocker_id.eq.${traveler.user_id},blocked_id.eq.${currentUserId})`)
-      .limit(1);
+    // Check if I am banned
+    const { data: profile } = await supabase.from('user_profiles').select('is_banned').eq('user_id', currentUserId).maybeSingle();
+    if (profile?.is_banned) {
+      toast.error('Your account is banned.');
+      setIsBlocked(true);
+      setSending(false);
+      return;
+    }
 
-    if (isBlockedNow && isBlockedNow.length > 0) {
+    // ACTIVE PRE-FLIGHT BLOCK CHECK
+    const { data: blockRecords } = await supabase.from('blocked_users').select('blocker_id, blocked_id')
+      .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+
+    const isBlockedNow = blockRecords?.some(b => b.blocker_id === traveler.user_id || b.blocked_id === traveler.user_id);
+
+    if (isBlockedNow) {
       toast.error('Cannot send message to this user');
       setIsBlocked(true);
       setSending(false);

@@ -210,6 +210,27 @@ export const UserProfile: React.FC = () => {
   const handlePing = async () => {
     if (!viewingCheckin || !currentUserId || alreadyPinged) return;
     setPingLoading(true);
+
+    // Check if I am banned
+    const { data: profile } = await supabase.from('user_profiles').select('is_banned').eq('user_id', currentUserId).maybeSingle();
+    if (profile?.is_banned) {
+      toast.error('Your account is banned.');
+      setPingLoading(false);
+      return;
+    }
+
+    // ACTIVE PRE-FLIGHT BLOCK CHECK
+    const { data: blockRecords } = await supabase.from('blocked_users').select('blocker_id, blocked_id')
+      .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+
+    const isBlocked = blockRecords?.some(b => b.blocker_id === viewingCheckin.user_id || b.blocked_id === viewingCheckin.user_id);
+
+    if (isBlocked) {
+      toast.error('Cannot interact with this user');
+      setPingLoading(false);
+      return;
+    }
+
     const { data: myCheckin } = await supabase.from('checkins').select('id, name').eq('user_id', currentUserId).eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
     const { error } = await supabase.from('pings').insert({ from_user_id: currentUserId, to_user_id: viewingCheckin.user_id, checkin_id: myCheckin?.id });
     if (error) { toast.error('Failed to send ping'); }

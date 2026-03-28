@@ -68,7 +68,12 @@ export const MultiplayerHub: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
 
-      const { data: profile } = await supabase.from('user_profiles').select('name, avatar_url').eq('user_id', user.id).single();
+      const { data: profile } = await supabase.from('user_profiles').select('name, avatar_url, is_banned').eq('user_id', user.id).single();
+      if (profile?.is_banned) {
+        toast.error('Your account is banned.');
+        navigate('/');
+        return;
+      }
       setCurrentUser({ id: user.id, name: profile?.name || 'Traveler', avatar_url: profile?.avatar_url });
 
       const { data: checkin } = await supabase
@@ -79,13 +84,23 @@ export const MultiplayerHub: React.FC = () => {
       if (!checkin) { navigate('/check-in'); return; }
       setCurrentCheckin(checkin);
 
+      // Fetch blocks to filter out blocked users
+      const { data: routeBlocks } = await supabase.from('blocked_users').select('blocker_id, blocked_id')
+        .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+      const blockedSet = new Set<string>();
+      routeBlocks?.forEach(b => {
+        blockedSet.add(b.blocker_id);
+        blockedSet.add(b.blocked_id);
+      });
+
       const { data: tvlrs } = await supabase
         .from('checkins').select('*')
         .eq('vehicle_id', checkin.vehicle_id)
         .eq('is_active', true)
         .neq('user_id', user.id);
       
-      setTravelers(tvlrs || []);
+      const filteredTvlrs = (tvlrs || []).filter(t => !blockedSet.has(t.user_id));
+      setTravelers(filteredTvlrs);
 
       const channel = supabase.channel(`games-${checkin.vehicle_id}`, {
         config: { broadcast: { self: true } }

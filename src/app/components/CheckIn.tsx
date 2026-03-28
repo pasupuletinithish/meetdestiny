@@ -526,7 +526,7 @@ export const CheckIn: React.FC = () => {
       let arrivalTime = routeAnalysis.estimatedTime;
       const avatarUrl = userAvatar || await getUserAvatar(user.id);
       // Generate a deterministic Route ID based on the corridor to allow matching!
-      const corridorHash = routeAnalysis.corridor.length > 1 ? `${routeAnalysis.corridor[0].substring(0,3).toUpperCase()}-${routeAnalysis.corridor[routeAnalysis.corridor.length-1].substring(0,3).toUpperCase()}` : `ROUTE-${Date.now()}`;
+      const corridorHash = routeAnalysis.corridor.length > 1 ? `${routeAnalysis.corridor[0].substring(0, 3).toUpperCase()}-${routeAnalysis.corridor[routeAnalysis.corridor.length - 1].substring(0, 3).toUpperCase()}` : `ROUTE-${Date.now()}`;
       const vehicleId = `ROUTE-${corridorHash}`;
 
       const { data: existingCheckin } = await supabase.from('checkins').select('expires_at, arrival_time').eq('vehicle_id', vehicleId).eq('is_active', true).limit(1).maybeSingle();

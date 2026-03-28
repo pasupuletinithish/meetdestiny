@@ -118,8 +118,16 @@ export async function sendPushNotification({
 }): Promise<void> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
+    
+    // Explicitly set authorization header to ensure Edge Function receives the JWT
+    const headers: Record<string, string> = {};
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+
     const { data, error } = await supabase.functions.invoke('send-push-notification', {
-      body: { user_id: userId, title, body, url }
+      body: { user_id: userId, title, body, url },
+      headers
     });
     
     if (error) {

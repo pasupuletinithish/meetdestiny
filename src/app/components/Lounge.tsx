@@ -89,19 +89,38 @@ export const Lounge: React.FC = () => {
       <div style={{ position: 'absolute', bottom: 24, left: 16, right: 16, zIndex: 50, display: 'flex', justifyContent: 'center' }}>
         <div style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', borderRadius: 32, padding: 6, display: 'flex', gap: 6, boxShadow: '0 8px 32px rgba(30,136,229,0.15)', border: '1px solid rgba(30,136,229,0.15)', width: '100%', maxWidth: 420 }}>
           
-          {/* Menu Button inline */}
+          {/* Premium Animated Menu Button */}
           <motion.button
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setMenuOpen(true)}
             style={{ 
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 44, height: 44, borderRadius: 22, border: 'none', cursor: 'pointer',
-              background: 'rgba(30,136,229,0.08)',
-              color: '#1E88E5',
-              flexShrink: 0
+              background: 'transparent',
+              position: 'relative',
+              flexShrink: 0,
+              boxShadow: '0 4px 16px rgba(30,136,229,0.2)'
             }}
           >
-            <Menu size={20} color="#1E88E5" />
+            {/* Ambient Pulse Aura */}
+            <motion.div 
+              animate={{ scale: [1, 1.4], opacity: [0.4, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+              style={{ position: 'absolute', inset: -2, borderRadius: 24, background: '#1E88E5' }}
+            />
+            
+            {/* Core Circular Fill */}
+            <div style={{ position: 'absolute', inset: 0, borderRadius: 22, background: 'rgba(255,255,255,0.95)', border: '1.5px solid rgba(30,136,229,0.3)', zIndex: 1 }} />
+
+            {/* Glowing Icon Container */}
+            <motion.div 
+              style={{ zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', borderRadius: 22, background: 'rgba(30,136,229,0.06)' }}
+              animate={{ filter: ['drop-shadow(0 0 2px rgba(30,136,229,0.2))', 'drop-shadow(0 0 6px rgba(30,136,229,0.6))', 'drop-shadow(0 0 2px rgba(30,136,229,0.2))'] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <Menu size={20} color="#1E88E5" strokeWidth={2.5} />
+            </motion.div>
           </motion.button>
 
           <div style={{ width: 1, background: 'rgba(30,136,229,0.15)', margin: '6px 2px' }} />

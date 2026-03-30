@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { MessageCircle, Users, MapPin, Radio, User as UserIcon, Gamepad2, Search, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { AdSlot } from './AdSlot';
+import { BottomNav } from './BottomNav';
 
 interface CheckinData {
   id: string;
@@ -122,7 +123,7 @@ export const Lounge: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', background: '#f8f9fa', padding: '24px 20px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', background: '#f8f9fa', padding: '24px 20px', paddingBottom: '110px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* Top Large Card: Group */}
@@ -285,24 +286,7 @@ export const Lounge: React.FC = () => {
         <AdSlot />
       </div>
 
-      {/* BOTTOM NAV */}
-      <div style={{
-        background: '#f8f8f8', borderTop: '1px solid #ddd', padding: '8px 16px env(safe-area-inset-bottom)',
-        display: 'flex', justifyContent: 'space-around', alignItems: 'center'
-      }}>
-        {[
-          { icon: <Radio style={{ width: 26, height: 26 }} />, label: 'Discover', active: false, action: () => navigate('/discovery') },
-          { icon: <MessageCircle style={{ width: 26, height: 26 }} />, label: 'Chats', active: true, action: () => {} },
-          { icon: <Users style={{ width: 26, height: 26 }} />, label: 'Friends', active: false, action: () => navigate('/friends') },
-          { icon: <Gamepad2 style={{ width: 26, height: 26 }} />, label: 'Activities', active: false, action: () => navigate('/activities') },
-        ].map(item => (
-          <motion.button key={item.label} onClick={item.action}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: item.active ? '#007AFF' : '#8e8e93', cursor: 'pointer' }}>
-            {item.icon}
-            <span style={{ fontSize: 10, fontWeight: 500 }}>{item.label}</span>
-          </motion.button>
-        ))}
-      </div>
+      <BottomNav activeTab="chats" />
     </div>
   );
 };

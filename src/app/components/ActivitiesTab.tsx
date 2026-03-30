@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { Radio, MessageCircle, Users, Gamepad2 } from 'lucide-react';
 import { AdSlot } from './AdSlot';
+import { BottomNav } from './BottomNav';
 
 export const ActivitiesTab: React.FC = () => {
   const navigate = useNavigate();
@@ -77,26 +78,7 @@ export const ActivitiesTab: React.FC = () => {
       </div>
 
       {/* BOTTOM NAV */}
-      <div style={{
-        position: 'relative', zIndex: 20, flexShrink: 0,
-        background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(0,0,0,0.05)',
-        padding: '8px 0 max(12px, env(safe-area-inset-bottom))',
-        display: 'flex', justifyContent: 'space-around',
-      }}>
-        {[
-          { icon: <Radio style={{ width: 24, height: 24 }} />, label: 'Discover', active: false, action: () => navigate('/discovery') },
-          { icon: <MessageCircle style={{ width: 24, height: 24 }} />, label: 'Lounge', active: false, action: () => navigate('/lounge') },
-          { icon: <Users style={{ width: 24, height: 24 }} />, label: 'Friends', active: false, action: () => navigate('/friends') },
-          { icon: <Gamepad2 style={{ width: 24, height: 24 }} />, label: 'Activities', active: true, action: () => {} },
-        ].map(item => (
-          <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 20px', color: item.active ? '#10b981' : '#94a3b8' }}>
-            {item.icon}
-            <span style={{ fontSize: 11, fontWeight: item.active ? 600 : 500 }}>{item.label}</span>
-          </motion.button>
-        ))}
-      </div>
+      <BottomNav activeTab="activities" />
     </div>
   );
 };

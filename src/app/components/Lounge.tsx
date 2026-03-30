@@ -47,9 +47,15 @@ export const Lounge: React.FC = () => {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '75%', maxWidth: 320, background: '#fff', zIndex: 100, boxShadow: '-10px 0 30px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}
             >
-              <div style={{ padding: '52px 24px 20px', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid #f1f5f9' }}>
-                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setMenuOpen(false)} style={{ width: 36, height: 36, borderRadius: '50%', background: '#f8fafc', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                  <X size={18} color="#64748b" />
+              <div style={{ padding: 'max(40px, env(safe-area-inset-top)) 24px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(30,136,229,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <motion.div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #1E88E5, #1565C0)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>M</span>
+                  </motion.div>
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, background: 'linear-gradient(135deg, #1E88E5, #1565C0)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>MeetDestiny</h2>
+                </div>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setMenuOpen(false)} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(30,136,229,0.08)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  <X size={18} color="#1E88E5" />
                 </motion.button>
               </div>
               <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>

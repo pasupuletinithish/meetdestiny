@@ -34,18 +34,31 @@ export const Lounge: React.FC = () => {
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', position: 'relative', overflow: 'hidden' }}>
       
       {/* ── HEADER ── */}
-      <div style={{ padding: '0px 20px', background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(0,0,0,0.08)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 100, paddingTop: 40, flexShrink: 0 }}>
+      <div style={{ padding: '0px 20px', background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(30,136,229,0.08)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 100, paddingTop: 40, flexShrink: 0 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 800, letterSpacing: '-0.8px', color: '#000' }}>Chats</h1>
-          <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#8e8e93', fontWeight: 500 }}>MeetDestiny Network</p>
+          <AnimatePresence mode="wait">
+            <motion.h1 
+              key={activeChat}
+              initial={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              style={{ margin: 0, fontSize: '28px', fontWeight: 800, letterSpacing: '-0.8px', background: 'linear-gradient(135deg, #1E88E5, #1565C0)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+            >
+              {activeChat === 'individual' ? 'Travelers' : activeChat === 'group' ? 'Vehicle Group' : 'Destination'}
+            </motion.h1>
+          </AnimatePresence>
+          <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#64748b', fontWeight: 600 }}>MeetDestiny Network</p>
         </div>
         
         <motion.button 
+          whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => setMenuOpen(true)}
-          style={{ width: 44, height: 44, borderRadius: '50%', background: '#f1f5f9', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}
+          style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(30,136,229,0.06)', border: '1.5px solid rgba(30,136,229,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', overflow: 'hidden' }}
         >
-          <Menu size={20} color="#0f172a" />
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: 'linear' }} style={{ position: 'absolute', inset: -2, background: 'conic-gradient(from 0deg, transparent 0%, rgba(30,136,229,0.2) 50%, transparent 100%)', borderRadius: '50%' }} />
+          <Menu size={20} color="#1E88E5" style={{ zIndex: 1 }} />
         </motion.button>
       </div>
 
@@ -72,20 +85,20 @@ export const Lounge: React.FC = () => {
                 <p style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 10px' }}>Navigation</p>
                 
                 {[
-                  { icon: <Radio size={20} />, label: 'Discovery', color: '#1E88E5', action: () => navigate('/discovery') },
-                  { icon: <MessageCircle size={20} />, label: 'Chats', color: '#10b981', action: () => { setMenuOpen(false); } },
-                  { icon: <Users size={20} />, label: 'Friends', color: '#f59e0b', action: () => navigate('/friends') },
-                  { icon: <Activity size={20} />, label: 'Activities', color: '#8b5cf6', action: () => navigate('/activities') },
-                  { icon: <UserIcon size={20} />, label: 'Profile', color: '#64748b', action: () => navigate('/profile') },
+                  { icon: <Radio size={20} />, label: 'Discovery', action: () => navigate('/discovery') },
+                  { icon: <MessageCircle size={20} />, label: 'Chats', action: () => { setMenuOpen(false); } },
+                  { icon: <Users size={20} />, label: 'Friends', action: () => navigate('/friends') },
+                  { icon: <Activity size={20} />, label: 'Activities', action: () => navigate('/activities') },
+                  { icon: <UserIcon size={20} />, label: 'Profile', action: () => navigate('/profile') },
                 ].map((item, i) => (
                   <motion.button 
                     key={item.label} whileTap={{ scale: 0.97 }} onClick={item.action}
-                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 16, background: item.label === 'Chats' ? `${item.color}15` : '#fff', border: item.label === 'Chats' ? `1px solid ${item.color}30` : '1px solid transparent', cursor: 'pointer' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 16, background: item.label === 'Chats' ? 'rgba(30,136,229,0.08)' : '#fff', border: item.label === 'Chats' ? '1px solid rgba(30,136,229,0.2)' : '1px solid transparent', cursor: 'pointer' }}
                   >
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: item.label === 'Chats' ? 'rgba(30,136,229,0.15)' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.label === 'Chats' ? '#1E88E5' : '#64748b' }}>
                       {item.icon}
                     </div>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: item.label === 'Chats' ? item.color : '#334155' }}>{item.label}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: item.label === 'Chats' ? '#1E88E5' : '#334155' }}>{item.label}</span>
                   </motion.button>
                 ))}
               </div>
@@ -105,9 +118,9 @@ export const Lounge: React.FC = () => {
       <div style={{ position: 'absolute', bottom: 24, left: 20, right: 20, zIndex: 50, display: 'flex', justifyContent: 'center' }}>
         <div style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', borderRadius: 30, padding: 6, display: 'flex', gap: 6, boxShadow: '0 8px 32px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)' }}>
           {[
-            { id: 'individual', icon: <UserIcon size={18} />, label: 'Chat', color: '#1E88E5' },
-            { id: 'group', icon: <Users size={18} />, label: 'Group', color: '#25D366' },
-            { id: 'destination', icon: <MapPin size={18} />, label: 'Dest', color: '#FF9500' }
+            { id: 'individual', icon: <UserIcon size={18} />, label: 'Chat' },
+            { id: 'group', icon: <Users size={18} />, label: 'Group' },
+            { id: 'destination', icon: <MapPin size={18} />, label: 'Dest' }
           ].map(btn => {
             const isActive = activeChat === btn.id;
             return (
@@ -119,7 +132,7 @@ export const Lounge: React.FC = () => {
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: isActive ? '10px 20px' : '10px 16px',
                   borderRadius: 24, border: 'none', cursor: 'pointer',
-                  background: isActive ? btn.color : 'transparent',
+                  background: isActive ? '#1E88E5' : 'transparent',
                   color: isActive ? '#fff' : '#64748b',
                   transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                   position: 'relative'

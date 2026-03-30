@@ -8,7 +8,6 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { notify } from '../../lib/notifications';
-import { BottomNav } from './BottomNav';
 
 interface SOSAlert {
   id: string;
@@ -434,7 +433,21 @@ export const SafetySOS: React.FC = () => {
       </div>
 
       {/* ── BOTTOM NAV ── */}
-      <BottomNav activeTab="" />
+      <div style={{ flexShrink: 0, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(30,136,229,0.08)', padding: '8px 0 max(12px, env(safe-area-inset-bottom))', display: 'flex', justifyContent: 'space-around', position: 'relative', zIndex: 20 }}>
+        {[
+          { icon: <Radio style={{ width: 22, height: 22 }} />, label: 'Discover', action: () => navigate('/discovery') },
+          { icon: <MessageCircle style={{ width: 22, height: 22 }} />, label: 'Lounge', action: () => navigate('/lounge') },
+          { icon: <Users style={{ width: 22, height: 22 }} />, label: 'Friends', action: () => navigate('/friends') },
+          { icon: <Shield style={{ width: 22, height: 22 }} />, label: 'Safety', action: () => {} },
+        ].map(item => (
+          <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 16px', color: item.label === 'Safety' ? '#ef4444' : '#94a3b8' }}>
+            {item.icon}
+            <span style={{ fontSize: 10, fontWeight: item.label === 'Safety' ? 700 : 400 }}>{item.label}</span>
+            {item.label === 'Safety' && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#ef4444', marginTop: -1 }} />}
+          </motion.button>
+        ))}
+      </div>
     </div>
   );
 };

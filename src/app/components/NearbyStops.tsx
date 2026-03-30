@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
-import { BottomNav } from './BottomNav';
 
 interface StopData {
   name: string;
@@ -325,7 +324,20 @@ export const NearbyStops: React.FC = () => {
       </div>
 
       {/* ── BOTTOM NAV ── */}
-      <BottomNav activeTab="" />
+      <div style={{ flexShrink: 0, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(30,136,229,0.08)', padding: '8px 0 max(12px, env(safe-area-inset-bottom))', display: 'flex', justifyContent: 'space-around', position: 'relative', zIndex: 20 }}>
+        {[
+          { icon: <Radio style={{ width: 22, height: 22 }} />, label: 'Discover', active: false, action: () => navigate('/discovery') },
+          { icon: <MessageCircle style={{ width: 22, height: 22 }} />, label: 'Lounge', active: false, action: () => navigate('/lounge') },
+          { icon: <Users style={{ width: 22, height: 22 }} />, label: 'Friends', active: false, action: () => navigate('/friends') },
+          { icon: <Gamepad2 style={{ width: 22, height: 22 }} />, label: 'Activities', active: false, action: () => navigate('/activities') },
+        ].map(item => (
+          <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 16px', color: '#94a3b8' }}>
+            {item.icon}
+            <span style={{ fontSize: 10, fontWeight: 400 }}>{item.label}</span>
+          </motion.button>
+        ))}
+      </div>
     </div>
   );
 };

@@ -1,72 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { motion } from 'motion/react';
-import { MessageCircle, Users, MapPin, Radio, User as UserIcon, Gamepad2, Search, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { MessageCircle, Users, MapPin, Menu, X, Radio, Activity, User as UserIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { AdSlot } from './AdSlot';
-
-interface CheckinData {
-  id: string;
-  user_id: string;
-  name: string;
-  profession: string;
-  vehicle_id: string;
-  from_location: string;
-  to_location: string;
-  arrival_time: string;
-  expires_at: string;
-}
-
-interface TravelerData {
-  id: string;
-  user_id: string;
-  name: string;
-  profession: string;
-  vehicle_id: string;
-  to_location: string;
-  arrival_time: string;
-  vibe: string;
-  avatar_url?: string;
-}
+import { VehicleGroupChat, DestinationChat } from './GroupChat';
+import { TravelersList } from './TravelersList';
 
 export const Lounge: React.FC = () => {
   const navigate = useNavigate();
-  const [currentCheckin, setCurrentCheckin] = useState<CheckinData | null>(null);
-  const [travelers, setTravelers] = useState<TravelerData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [groupMessageCount, setGroupMessageCount] = useState(0);
-  const [destMessageCount, setDestMessageCount] = useState(0);
+  const [activeChat, setActiveChat] = useState<'individual' | 'group' | 'destination'>('individual');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [unreadPrivate, setUnreadPrivate] = useState(0);
 
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate('/'); return; }
-
-      const { data: checkin } = await supabase
-        .from('checkins').select('*')
-        .eq('user_id', user.id).eq('is_active', true)
-        .order('created_at', { ascending: false }).limit(1).maybeSingle();
-
-      if (!checkin) { navigate('/check-in'); return; }
-      setCurrentCheckin(checkin);
-
-      const { data: tvlrs } = await supabase
-        .from('checkins').select('*')
-        .eq('vehicle_id', checkin.vehicle_id)
-        .eq('is_active', true)
-        .neq('user_id', user.id);
-      setTravelers(tvlrs || []);
-
-      const { count: gCount } = await supabase
-        .from('lounge_messages').select('*', { count: 'exact', head: true })
-        .eq('vehicle_id', checkin.vehicle_id);
-      setGroupMessageCount(gCount || 0);
-
-      const { count: dCount } = await supabase
-        .from('destination_messages').select('*', { count: 'exact', head: true })
-        .eq('destination', checkin.to_location);
-      setDestMessageCount(dCount || 0);
+      if (!user) return;
 
       const { data: blockedData } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', user.id);
       const blockedSet = new Set(blockedData?.map(b => b.blocked_id) || []);
@@ -77,232 +26,119 @@ export const Lounge: React.FC = () => {
 
       const unreadCount = (unreadMsgs || []).filter(m => !blockedSet.has(m.from_user_id)).length;
       setUnreadPrivate(unreadCount);
-
-      setLoading(false);
     };
     init();
-  }, [navigate]);
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
-        <Loader2 style={{ width: 32, height: 32, color: '#007AFF' }} className="animate-spin" />
-      </div>
-    );
-  }
-
+  }, []);
 
   return (
-    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-      {/* Premium iOS-style Header with Cool Logo Animation */}
-      <div style={{ padding: '52px 20px 16px', background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(0,0,0,0.08)', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '34px', fontWeight: 800, letterSpacing: '-0.8px', color: '#000' }}>Chats</h1>
-            <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#8e8e93', fontWeight: 500 }}>MeetDestiny Network</p>
-          </div>
-          <motion.div
-            animate={{ 
-              boxShadow: [
-                '0 0 0px 0px rgba(0, 122, 255, 0)',
-                '0 0 20px 4px rgba(0, 122, 255, 0.15)',
-                '0 0 0px 0px rgba(0, 122, 255, 0)'
-              ]
-            }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ position: 'relative', width: 44, height: 44, borderRadius: '22px', background: 'linear-gradient(135deg, #007AFF, #5856D6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-              style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', border: '2px dashed rgba(255,255,255,0.3)', opacity: 0.8 }}
-            />
-            <Radio size={22} color="#fff" strokeWidth={2.5} />
-          </motion.div>
+    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', position: 'relative', overflow: 'hidden' }}>
+      
+      {/* ── HEADER ── */}
+      <div style={{ padding: '0px 20px', background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(0,0,0,0.08)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 100, paddingTop: 40, flexShrink: 0 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 800, letterSpacing: '-0.8px', color: '#000' }}>Chats</h1>
+          <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#8e8e93', fontWeight: 500 }}>MeetDestiny Network</p>
         </div>
+        
+        <motion.button 
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setMenuOpen(true)}
+          style={{ width: 44, height: 44, borderRadius: '50%', background: '#f1f5f9', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}
+        >
+          <Menu size={20} color="#0f172a" />
+        </motion.button>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', background: '#f8f9fa', padding: '24px 20px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
-          {/* Top Large Card: Group */}
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate('/lounge/group')}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, type: 'spring' }}
-            style={{ 
-              borderRadius: '28px', 
-              padding: '28px',
-              background: 'linear-gradient(135deg, #25D366, #128C7E)',
-              color: '#fff',
-              boxShadow: '0 16px 40px rgba(37, 211, 102, 0.25)',
-              position: 'relative',
-              overflow: 'hidden',
-              cursor: 'pointer'
-            }}
-          >
-            {/* Background motion graphics */}
+      {/* ── HAMBURGER MENU OVERLAY ── */}
+      <AnimatePresence>
+        {menuOpen && (
+          <>
             <motion.div 
-               animate={{ rotate: 360 }}
-               transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-               style={{ position: 'absolute', top: '-30%', right: '-15%', width: '200px', height: '200px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%' }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setMenuOpen(false)}
+              style={{ position: 'absolute', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} 
             />
             <motion.div 
-               animate={{ rotate: -360 }}
-               transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-               style={{ position: 'absolute', bottom: '-40%', left: '-10%', width: '160px', height: '160px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }}
-            />
-            
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.2)', padding: '14px', borderRadius: '20px', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
-                  <MessageCircle size={36} color="#fff" />
-                </div>
-                {groupMessageCount > 0 && (
-                  <motion.div 
-                    initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 }}
-                    style={{ background: 'rgba(255,255,255,0.3)', padding: '8px 16px', borderRadius: '24px', fontSize: '14px', fontWeight: 600, backdropFilter: 'blur(8px)' }}
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '75%', maxWidth: 320, background: '#fff', zIndex: 100, boxShadow: '-10px 0 30px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}
+            >
+              <div style={{ padding: '52px 24px 20px', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid #f1f5f9' }}>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setMenuOpen(false)} style={{ width: 36, height: 36, borderRadius: '50%', background: '#f8fafc', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  <X size={18} color="#64748b" />
+                </motion.button>
+              </div>
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 10px' }}>Navigation</p>
+                
+                {[
+                  { icon: <Radio size={20} />, label: 'Discovery', color: '#1E88E5', action: () => navigate('/discovery') },
+                  { icon: <MessageCircle size={20} />, label: 'Chats', color: '#10b981', action: () => { setMenuOpen(false); } },
+                  { icon: <Users size={20} />, label: 'Friends', color: '#f59e0b', action: () => navigate('/friends') },
+                  { icon: <Activity size={20} />, label: 'Activities', color: '#8b5cf6', action: () => navigate('/activities') },
+                  { icon: <UserIcon size={20} />, label: 'Profile', color: '#64748b', action: () => navigate('/profile') },
+                ].map((item, i) => (
+                  <motion.button 
+                    key={item.label} whileTap={{ scale: 0.97 }} onClick={item.action}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 16, background: item.label === 'Chats' ? `${item.color}15` : '#fff', border: item.label === 'Chats' ? `1px solid ${item.color}30` : '1px solid transparent', cursor: 'pointer' }}
                   >
-                    {groupMessageCount} recent
-                  </motion.div>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color }}>
+                      {item.icon}
+                    </div>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: item.label === 'Chats' ? item.color : '#334155' }}>{item.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── ACTIVE CHAT BODY ── */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', paddingBottom: 80 }}>
+        {activeChat === 'individual' && <TravelersList isChild />}
+        {activeChat === 'group' && <VehicleGroupChat isChild />}
+        {activeChat === 'destination' && <DestinationChat isChild />}
+      </div>
+
+      {/* ── FLOATING BUTTONS (Segmented Pill) ── */}
+      <div style={{ position: 'absolute', bottom: 24, left: 20, right: 20, zIndex: 50, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', borderRadius: 30, padding: 6, display: 'flex', gap: 6, boxShadow: '0 8px 32px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)' }}>
+          {[
+            { id: 'individual', icon: <UserIcon size={18} />, label: 'Chat', color: '#1E88E5' },
+            { id: 'group', icon: <Users size={18} />, label: 'Group', color: '#25D366' },
+            { id: 'destination', icon: <MapPin size={18} />, label: 'Dest', color: '#FF9500' }
+          ].map(btn => {
+            const isActive = activeChat === btn.id;
+            return (
+              <motion.button
+                key={btn.id}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setActiveChat(btn.id as any)}
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: isActive ? '10px 20px' : '10px 16px',
+                  borderRadius: 24, border: 'none', cursor: 'pointer',
+                  background: isActive ? btn.color : 'transparent',
+                  color: isActive ? '#fff' : '#64748b',
+                  transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                  position: 'relative'
+                }}
+              >
+                {/* Unread badge for individual mode */}
+                {btn.id === 'individual' && unreadPrivate > 0 && !isActive && (
+                  <div style={{ position: 'absolute', top: -4, right: -4, background: '#FF3B30', color: '#fff', fontSize: 10, fontWeight: 800, width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
+                    {unreadPrivate}
+                  </div>
                 )}
-              </div>
-              
-              <h2 style={{ margin: '0 0 8px 0', fontSize: '32px', fontWeight: 800, letterSpacing: '-0.8px' }}>
-                Vehicle Group
-              </h2>
-              <p style={{ margin: 0, fontSize: '16px', opacity: 0.9, fontWeight: 500 }}>
-                {currentCheckin?.vehicle_id || 'Join your fellow travelers'}
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Bottom Grid: Individual & Destination */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            
-            {/* Individual Card */}
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.96 }}
-              onClick={() => navigate('/lounge/travelers')}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1, type: 'spring' }}
-              style={{ 
-                borderRadius: '28px', 
-                padding: '24px 20px',
-                background: 'linear-gradient(135deg, #007AFF, #5856D6)',
-                color: '#fff',
-                boxShadow: '0 16px 32px rgba(0, 122, 255, 0.25)',
-                position: 'relative',
-                overflow: 'hidden',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: '200px'
-              }}
-            >
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                  <div style={{ background: 'rgba(255,255,255,0.2)', padding: '12px', borderRadius: '18px', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
-                    <Users size={30} color="#fff" />
-                  </div>
-                  {unreadPrivate > 0 && (
-                    <motion.div 
-                      animate={{ scale: [1, 1.15, 1] }} 
-                      transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
-                      style={{ background: '#FF3B30', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 800, border: '3px solid rgba(255,255,255,0.4)', boxShadow: '0 4px 12px rgba(255,59,48,0.4)' }}
-                    >
-                      {unreadPrivate}
-                    </motion.div>
-                  )}
-                </div>
-                <h3 style={{ margin: '0 0 6px 0', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px' }}>Individual</h3>
-                <p style={{ margin: 0, fontSize: '14px', opacity: 0.85, lineHeight: 1.3, fontWeight: 500 }}>
-                  {travelers.length} active now
-                </p>
-              </div>
-              
-              <motion.div 
-                 animate={{ scale: [1, 1.5, 1], opacity: [0.05, 0.15, 0.05] }}
-                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                 style={{ position: 'absolute', bottom: '-30px', right: '-30px', width: '120px', height: '120px', background: '#fff', borderRadius: '50%' }}
-              />
-            </motion.div>
-
-            {/* Destination Card */}
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.96 }}
-              onClick={() => navigate('/lounge/destination')}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2, type: 'spring' }}
-              style={{ 
-                borderRadius: '28px', 
-                padding: '24px 20px',
-                background: 'linear-gradient(135deg, #FF9500, #FF2D55)',
-                color: '#fff',
-                boxShadow: '0 16px 32px rgba(255, 45, 85, 0.25)',
-                position: 'relative',
-                overflow: 'hidden',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: '200px'
-              }}
-            >
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                  <div style={{ background: 'rgba(255,255,255,0.2)', padding: '12px', borderRadius: '18px', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
-                    <MapPin size={30} color="#fff" />
-                  </div>
-                </div>
-                <h3 style={{ margin: '0 0 6px 0', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px' }}>Destination</h3>
-                <p style={{ margin: 0, fontSize: '14px', opacity: 0.85, lineHeight: 1.3, fontWeight: 500, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {currentCheckin?.to_location || 'Explore hub'}
-                </p>
-              </div>
-              
-              <motion.div 
-                 animate={{ scale: [1, 1.2, 1], opacity: [0.08, 0.2, 0.08], rotate: 180 }}
-                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                 style={{ position: 'absolute', top: '10px', right: '-40px', width: '150px', height: '150px', background: 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%)', borderRadius: '50%' }}
-              />
-            </motion.div>
-
-          </div>
+                {btn.icon}
+                {isActive && <span style={{ fontSize: 14, fontWeight: 700 }}>{btn.label}</span>}
+              </motion.button>
+            );
+          })}
         </div>
       </div>
-
-      {/* Bottom AdSlot */}
-      <div style={{ padding: '16px', background: '#fff' }}>
-        <AdSlot />
-      </div>
-
-      {/* BOTTOM NAV */}
-      <div style={{
-        background: '#f8f8f8', borderTop: '1px solid #ddd', padding: '8px 16px env(safe-area-inset-bottom)',
-        display: 'flex', justifyContent: 'space-around', alignItems: 'center'
-      }}>
-        {[
-          { icon: <Radio style={{ width: 26, height: 26 }} />, label: 'Discover', active: false, action: () => navigate('/discovery') },
-          { icon: <MessageCircle style={{ width: 26, height: 26 }} />, label: 'Chats', active: true, action: () => {} },
-          { icon: <Users style={{ width: 26, height: 26 }} />, label: 'Friends', active: false, action: () => navigate('/friends') },
-          { icon: <Gamepad2 style={{ width: 26, height: 26 }} />, label: 'Activities', active: false, action: () => navigate('/activities') },
-        ].map(item => (
-          <motion.button key={item.label} onClick={item.action}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: item.active ? '#007AFF' : '#8e8e93', cursor: 'pointer' }}>
-            {item.icon}
-            <span style={{ fontSize: 10, fontWeight: 500 }}>{item.label}</span>
-          </motion.button>
-        ))}
-      </div>
+      
     </div>
   );
 };

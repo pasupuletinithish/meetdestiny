@@ -22,7 +22,7 @@ const vibeLabels: Record<string, string> = {
   ready: 'Open to chat', logistics: 'Logistics only', lurking: 'Just lurking',
 };
 
-export const TravelersList: React.FC = () => {
+export const TravelersList: React.FC<{ isChild?: boolean }> = ({ isChild }) => {
   const navigate = useNavigate();
   const [travelers, setTravelers] = useState<TravelerData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,26 +79,28 @@ export const TravelersList: React.FC = () => {
 
   return (
     <div style={{
-      height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      height: isChild ? '100%' : '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
       background: 'linear-gradient(160deg, #E3F2FD 0%, #ffffff 45%, #FFE8E0 100%)',
       fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', width: '100%',
     }}>
 
       {/* Header */}
-      <div style={{ flexShrink: 0, padding: '16px 20px', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(30,136,229,0.08)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate('/lounge')}
-            style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(30,136,229,0.08)', border: '1px solid rgba(30,136,229,0.15)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ArrowLeft style={{ width: 16, height: 16, color: '#1E88E5' }} />
-          </motion.button>
-          <div>
-            <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, background: 'linear-gradient(90deg, #1E88E5, #1565C0)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              Individual Chats
-            </h1>
-            <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{travelers.length} travelers available</p>
+      {!isChild && (
+        <div style={{ flexShrink: 0, padding: '16px 20px', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(30,136,229,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate('/lounge')}
+              style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(30,136,229,0.08)', border: '1px solid rgba(30,136,229,0.15)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowLeft style={{ width: 16, height: 16, color: '#1E88E5' }} />
+            </motion.button>
+            <div>
+              <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, background: 'linear-gradient(90deg, #1E88E5, #1565C0)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                Individual Chats
+              </h1>
+              <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{travelers.length} travelers available</p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', scrollbarWidth: 'none' }}>
@@ -170,19 +172,21 @@ export const TravelersList: React.FC = () => {
       </div>
 
       {/* Bottom Nav */}
-      <div style={{ flexShrink: 0, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(30,136,229,0.08)', padding: '8px 0 max(12px, env(safe-area-inset-bottom))', display: 'flex', justifyContent: 'space-around' }}>
-        {[
-          { icon: <Radio style={{ width: 22, height: 22 }} />, label: 'Discover', action: () => navigate('/discovery') },
-          { icon: <MessageCircle style={{ width: 22, height: 22 }} />, label: 'Lounge', active: true, action: () => navigate('/lounge') },
-          { icon: <Gamepad2 style={{ width: 22, height: 22 }} />, label: 'Activities', action: () => navigate('/activities') },
-        ].map(item => (
-          <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 20px', color: (item as any).active ? '#1E88E5' : '#94a3b8' }}>
-            {item.icon}
-            <span style={{ fontSize: 10, fontWeight: (item as any).active ? 700 : 400 }}>{item.label}</span>
-          </motion.button>
-        ))}
-      </div>
+      {!isChild && (
+        <div style={{ flexShrink: 0, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(30,136,229,0.08)', padding: '8px 0 max(12px, env(safe-area-inset-bottom))', display: 'flex', justifyContent: 'space-around' }}>
+          {[
+            { icon: <Radio style={{ width: 22, height: 22 }} />, label: 'Discover', action: () => navigate('/discovery') },
+            { icon: <MessageCircle style={{ width: 22, height: 22 }} />, label: 'Lounge', active: true, action: () => navigate('/lounge') },
+            { icon: <Gamepad2 style={{ width: 22, height: 22 }} />, label: 'Activities', action: () => navigate('/activities') },
+          ].map(item => (
+            <motion.button key={item.label} whileTap={{ scale: 0.88 }} onClick={item.action}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 20px', color: (item as any).active ? '#1E88E5' : '#94a3b8' }}>
+              {item.icon}
+              <span style={{ fontSize: 10, fontWeight: (item as any).active ? 700 : 400 }}>{item.label}</span>
+            </motion.button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

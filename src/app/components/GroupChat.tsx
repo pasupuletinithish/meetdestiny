@@ -141,7 +141,7 @@ If violation, include "${userName}" in your sarcastic ai_reply. Pick a random fu
   }
 };
 
-export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode }) => {
+export const GroupChat: React.FC<{ mode: 'group' | 'destination', isChild?: boolean }> = ({ mode, isChild }) => {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState('');
@@ -540,15 +540,17 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
   }
 
   return (
-    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(160deg, #E3F2FD 0%, #ffffff 45%, #FFE8E0 100%)', fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', width: '100%' }}>
+    <div style={{ height: isChild ? '100%' : '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(160deg, #E3F2FD 0%, #ffffff 45%, #FFE8E0 100%)', fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', width: '100%' }}>
 
       {/* ── Header ── */}
       <div style={{ flexShrink: 0, padding: '14px 16px', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderBottom: `2px solid ${accentColor}20`, boxShadow: `0 2px 12px ${accentGlow}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate('/lounge')}
-            style={{ width: 36, height: 36, borderRadius: 10, background: `${accentColor}15`, border: `1px solid ${accentColor}25`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <ArrowLeft style={{ width: 16, height: 16, color: accentColor }} />
-          </motion.button>
+          {!isChild && (
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate('/lounge')}
+              style={{ width: 36, height: 36, borderRadius: 10, background: `${accentColor}15`, border: `1px solid ${accentColor}25`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ArrowLeft style={{ width: 16, height: 16, color: accentColor }} />
+            </motion.button>
+          )}
 
           <div style={{ width: 42, height: 42, borderRadius: 13, background: `linear-gradient(135deg, ${accentColor}, ${isGroup ? '#E85A2B' : '#5b21b6'})`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: `0 4px 12px ${accentGlow}` }}>
             {isGroup ? <Users style={{ width: 18, height: 18, color: '#fff' }} /> : <MapPin style={{ width: 18, height: 18, color: '#fff' }} />}
@@ -764,5 +766,5 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination' }> = ({ mode })
   );
 };
 
-export const VehicleGroupChat: React.FC = () => <GroupChat mode="group" />;
-export const DestinationChat: React.FC = () => <GroupChat mode="destination" />;
+export const VehicleGroupChat: React.FC<{ isChild?: boolean }> = ({ isChild }) => <GroupChat mode="group" isChild={isChild} />;
+export const DestinationChat: React.FC<{ isChild?: boolean }> = ({ isChild }) => <GroupChat mode="destination" isChild={isChild} />;

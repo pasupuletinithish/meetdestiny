@@ -246,13 +246,19 @@ export const GroupChat: React.FC<{ mode: 'group' | 'destination', isChild?: bool
         .or('is_flagged.eq.false,is_flagged.is.null')
         .order('created_at', { ascending: true });
         
-      setMessages((msgs || []).filter(m => !blockedSet.has(m.user_id)));
-
-      const { count } = await supabase
-        .from('checkins').select('*', { count: 'exact', head: true })
+      const { data: activeCheckins } = await supabase
+        .from('checkins').select('user_id')
         .eq(isGroup ? 'vehicle_id' : 'to_location', chatId)
-        .eq('is_active', true);
-      setMemberCount(count || 0);
+        .eq('is_active', true)
+        .gte('expires_at', new Date().toISOString());
+
+      const activeUserIds = new Set(activeCheckins?.map(c => c.user_id) || []);
+      setMemberCount(activeCheckins?.length || 0);
+
+      setMessages((msgs || []).filter(m => 
+        !blockedSet.has(m.user_id) && 
+        (m.is_ai || m.user_id === null || activeUserIds.has(m.user_id))
+      ));
 
       const { data: mute } = await supabase
         .from('muted_chats').select('*')

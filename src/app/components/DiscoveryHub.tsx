@@ -510,21 +510,20 @@ await supabase.functions.invoke('pick-winner', {
 
       {/* ── CONTEST BANNER ── */}
       {hasActiveJourney && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => navigate('/contest')}
-          style={{ margin: '0 16px 8px', borderRadius: 14, background: 'linear-gradient(135deg, #f59e0b, #d97706)', padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'relative', zIndex: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 22 }}>🏆</span>
+          style={{ margin: '0 16px 8px', borderRadius: 20, background: 'linear-gradient(135deg, rgba(245,158,11,0.95), rgba(217,119,6,0.95))', padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'relative', zIndex: 20, backdropFilter: 'blur(10px)', boxShadow: '0 4px 15px rgba(245,158,11,0.25)', border: '1px solid rgba(255,255,255,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <motion.div animate={{ rotate: [0, -10, 10, 0] }} transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }} style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.3)' }}>🏆</motion.div>
             <div>
-              <p style={{ fontSize: 11, fontWeight: 800, color: '#fff', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today's Contest</p>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: 0 }}>{todayContest.name}</p>
-              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', margin: 0 }}>{todayContest.desc}</p>
+              <p style={{ fontSize: 13, fontWeight: 800, color: '#fff', margin: 0, textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>{todayContest.name}</p>
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.9)', margin: 0, fontWeight: 500 }}>{todayContest.desc}</p>
             </div>
           </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Score</p>
-            <p style={{ fontSize: 24, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1 }}>{myScore}</p>
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', margin: '2px 0 0' }}>Tap for leaderboard</p>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ backgroundColor: 'rgba(0,0,0,0.15)', padding: '4px 12px', borderRadius: 12, fontSize: 15, fontWeight: 800, color: '#fff', display: 'inline-block', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' }}>{myScore} <span style={{fontSize: 10, fontWeight: 600, opacity: 0.8}}>PTS</span></span>
           </div>
         </motion.div>
       )}
@@ -616,9 +615,10 @@ await supabase.functions.invoke('pick-winner', {
             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.6 }}>
               No travelers on <strong style={{ color: '#1E88E5' }}>{currentCheckin?.vehicle_id}</strong> yet. Be the first!
             </p>
-            <motion.button whileTap={{ scale: 0.96 }} onClick={() => navigate('/notify-me')}
-              style={{ padding: '12px 24px', borderRadius: 14, fontSize: 14, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #FF6B35, #E85A2B)', border: 'none', cursor: 'pointer', boxShadow: '0 8px 24px rgba(255,107,53,0.3)' }}>
-              🔔 Notify me when someone joins
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate('/notify-me')}
+              style={{ padding: '10px 24px', borderRadius: 30, fontSize: 13, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #FF6B35, #E85A2B)', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', boxShadow: '0 8px 20px rgba(255,107,53,0.4)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <motion.div animate={{ rotate: [0, 15, -15, 0] }} transition={{ repeat: Infinity, duration: 1.5 }}>🔔</motion.div>
+              Notify on Join
             </motion.button>
           </div>
 
@@ -722,35 +722,45 @@ await supabase.functions.invoke('pick-winner', {
         )}
       </div>
 
-      {/* Nearby Stops + Safety SOS */}
+      {/* ── QUICK ACTIONS DOCK ── */}
       {hasActiveJourney && (
-        <div style={{ display: 'flex', gap: 10, padding: '0 16px 8px', flexShrink: 0, position: 'relative', zIndex: 20 }}>
-          <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate('/nearby-stops')}
-            style={{ flex: 1, padding: '11px 16px', borderRadius: 14, border: '1.5px solid rgba(30,136,229,0.15)', background: 'rgba(255,255,255,0.8)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <MapPin style={{ width: 16, height: 16, color: '#1E88E5' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Nearby Stops</span>
+        <div style={{ position: 'relative', zIndex: 20, padding: '12px 16px 14px', background: 'linear-gradient(to top, rgba(238,246,255,1) 0%, rgba(255,255,255,0.8) 100%)', backdropFilter: 'blur(10px)', borderTop: '1px solid rgba(255,255,255,0.5)', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+          
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }} onClick={() => navigate('/nearby-stops')}
+            style={{ width: 46, height: 46, borderRadius: 16, border: '1px solid rgba(30,136,229,0.2)', background: 'rgba(255,255,255,0.9)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(30,136,229,0.1)', flexShrink: 0 }}>
+            <MapPin style={{ width: 22, height: 22, color: '#1E88E5' }} />
           </motion.button>
-          <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate('/safety-sos')}
-            style={{ flex: 1, padding: '11px 16px', borderRadius: 14, border: '1.5px solid rgba(239,68,68,0.15)', background: 'rgba(239,68,68,0.04)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <Shield style={{ width: 16, height: 16, color: '#ef4444' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#ef4444' }}>Safety SOS</span>
-          </motion.button>
-        </div>
-      )}
 
-      {/* ── BOTTOM ACTION ROW ── */}
-      {hasActiveJourney && (
-        <div style={{ position: 'relative', zIndex: 20, flexShrink: 0, padding: '10px 16px', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(30,136,229,0.08)', display: 'flex', gap: 10, alignItems: 'stretch' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, background: 'rgba(255,255,255,0.9)', border: '1.5px solid rgba(30,136,229,0.12)', borderRadius: 12, padding: '8px 12px' }}>
-            {invisibleMode ? <EyeOff style={{ width: 15, height: 15, color: '#94a3b8', flexShrink: 0 }} /> : <Eye style={{ width: 15, height: 15, color: '#1E88E5', flexShrink: 0 }} />}
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#475569', flex: 1 }}>Invisible</span>
-            <Switch checked={invisibleMode} onCheckedChange={setInvisibleMode} />
-          </div>
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={() => navigate('/lounge')}
-            style={{ flex: 1.3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 16px', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #FF6B35, #E85A2B)', boxShadow: '0 4px 16px rgba(255,107,53,0.3)' }}>
-            <MessageCircle style={{ width: 15, height: 15, color: '#fff' }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Join Lounge</span>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }} onClick={() => navigate('/safety-sos')}
+            style={{ width: 46, height: 46, borderRadius: 16, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(255,255,255,0.9)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(239,68,68,0.1)', flexShrink: 0 }}>
+            <Shield style={{ width: 22, height: 22, color: '#ef4444' }} />
           </motion.button>
+
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }} onClick={() => setInvisibleMode(!invisibleMode)}
+            style={{ width: 46, height: 46, borderRadius: 16, border: invisibleMode ? '1px solid rgba(148,163,184,0.3)' : '1px solid rgba(30,136,229,0.3)', background: invisibleMode ? 'rgba(241,245,249,0.9)' : 'rgba(240,249,255,0.9)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', position: 'relative', flexShrink: 0 }}>
+            <AnimatePresence mode="wait">
+              {invisibleMode ? (
+                <motion.div key="off" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }}>
+                  <EyeOff style={{ width: 22, height: 22, color: '#94a3b8' }} />
+                </motion.div>
+              ) : (
+                <motion.div key="on" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }}>
+                  <Eye style={{ width: 22, height: 22, color: '#1E88E5' }} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {!invisibleMode && <motion.div style={{ position: 'absolute', top: -3, right: -3, width: 12, height: 12, borderRadius: '50%', background: '#22c55e', border: '2px solid white' }} />}
+          </motion.button>
+
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={() => navigate('/lounge')}
+            style={{ flex: 1, height: 46, borderRadius: 16, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #1E88E5, #FF6B35)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 15px rgba(30,136,229,0.3)' }}>
+            <MessageCircle style={{ width: 20, height: 20, color: '#fff' }} fill="white" />
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Join Lounge</span>
+            <motion.div animate={{ x: [0, 4, 0] }} transition={{ repeat: Infinity, duration: 1.5 }} style={{ marginLeft: 2, display: 'flex', alignItems: 'center' }}>
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </motion.div>
+          </motion.button>
+
         </div>
       )}
 

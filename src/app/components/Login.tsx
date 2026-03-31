@@ -276,26 +276,37 @@ function LoginForm({
 
         {/* 3D Realistic Assets traversing the routes using zero-JS SVG animateMotion */}
         
-        {/* 3D Train */}
-        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/High-speed%20train/3D/high-speed_train_3d.png" width="64" height="64" x="-32" y="-32">
+        {/* Premium Top-Down Train Vector */}
+        <g>
           <animateMotion dur="25s" repeatCount="indefinite" rotate="auto">
             <mpath href="#route-train"/>
           </animateMotion>
-        </image>
+          <rect x="-24" y="-8" width="48" height="16" rx="8" fill="#1E88E5" opacity="0.3" filter="blur(4px)" />
+          <rect x="-20" y="-6" width="40" height="12" rx="6" fill="#1E88E5" />
+          <path d="M 10 -4 L 16 -2 L 16 2 L 10 4 Z" fill="#ffffff" />
+          <rect x="-14" y="-2" width="20" height="4" rx="2" fill="#ffffff" opacity="0.4" />
+        </g>
 
-        {/* 3D Bus */}
-        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Bus/3D/bus_3d.png" width="56" height="56" x="-28" y="-28">
+        {/* Premium Top-Down Bus Vector */}
+        <g>
           <animateMotion dur="35s" repeatCount="indefinite" rotate="auto">
             <mpath href="#route-bus"/>
           </animateMotion>
-        </image>
+          <rect x="-20" y="-10" width="40" height="20" rx="6" fill="#FF6B35" opacity="0.3" filter="blur(4px)" />
+          <rect x="-16" y="-8" width="32" height="16" rx="4" fill="#FF6B35" />
+          <rect x="10" y="-6" width="4" height="12" rx="1.5" fill="#ffffff" />
+          <rect x="-12" y="-5" width="18" height="10" rx="2" fill="#000000" opacity="0.1" />
+        </g>
 
-        {/* 3D Human / Traveler */}
-        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Person%20walking/Default/3D/person_walking_3d_default.png" width="48" height="48" x="-24" y="-24">
-          <animateMotion dur="45s" repeatCount="indefinite" rotate="0">
+        {/* Premium Top-Down Traveler Vector */}
+        <g>
+          <animateMotion dur="45s" repeatCount="indefinite" rotate="auto">
             <mpath href="#route-human"/>
           </animateMotion>
-        </image>
+          <circle cx="0" cy="0" r="14" fill="#534AB7" opacity="0.3" filter="blur(3px)" />
+          <rect x="-6" y="-7" width="10" height="14" rx="5" fill="#534AB7" />
+          <circle cx="2" cy="0" r="5" fill="#ffffff" />
+        </g>
 
         {/* Networking Pulse Nodes */}
         <motion.circle cx="600" cy="200" r="4" fill="#534AB7" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 3, repeat: Infinity }} />

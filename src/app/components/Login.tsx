@@ -254,49 +254,70 @@ function LoginForm({
         />
       </div>
 
-      {/* 2. Abstract Floating 3D Assets (No visible lines, pure fluid drifting) */}
-      <svg className="absolute inset-0 w-full h-full z-0 pointer-events-none" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
-        {/* Invisible Drift Paths */}
-        <path id="drift-train" d="M -300 1200 C 200 800, 800 300, 1300 -200" fill="none" />
-        <path id="drift-bus" d="M 1300 800 C 800 900, 200 1000, -300 700" fill="none" />
-        <path id="drift-human" d="M 300 1300 C 400 800, 600 300, 800 -300" fill="none" />
-        <path id="drift-plane" d="M -300 100 C 300 -50, 800 150, 1300 300" fill="none" />
-        <path id="drift-scooter" d="M 1300 300 C 800 450, 300 150, -300 -100" fill="none" />
+      {/* 2. Realistic 3D Travel Network (High Performance SVG animateMotion) */}
+      <svg className="absolute inset-0 w-full h-full z-0 opacity-60 pointer-events-none" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="pathGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#1E88E5" stopOpacity="0.1" />
+            <stop offset="50%" stopColor="#534AB7" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#FF6B35" stopOpacity="0.1" />
+          </linearGradient>
+          <linearGradient id="pathGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#FF6B35" stopOpacity="0.1" />
+            <stop offset="50%" stopColor="#D4537E" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#1E88E5" stopOpacity="0.1" />
+          </linearGradient>
+        </defs>
+        
+        {/* Animated Background Paths intersecting exactly at invisible Hubs */}
+        {/* Train Route: Top-Left to Bottom-Right */}
+        <path id="route-train" d="M 150 -100 C 250 0, 350 100, 450 200 S 550 400, 650 500 S 850 800, 950 1100" fill="none" stroke="transparent" />
+        
+        {/* Bus Route: Top-Right to Bottom-Left */}
+        <path id="route-bus" d="M 850 -100 C 750 100, 700 350, 650 500 S 450 650, 350 800 S 150 1000, 50 1100" fill="none" stroke="transparent" />
+        
+        {/* Human Route: Bottom-Left to Top-Right sweeping through West */}
+        <path id="route-human" d="M 150 1100 C 250 1000, 300 900, 350 800 S 300 300, 450 200 S 650 0, 750 -100" fill="none" stroke="transparent" />
 
-        {/* 3D Giant Train */}
-        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/High-speed%20train/3D/high-speed_train_3d.png" width="180" height="180" x="-90" y="-90" opacity="0.6" style={{ filter: 'drop-shadow(0px 20px 30px rgba(30,136,229,0.2))' }}>
-          <animateMotion dur="50s" repeatCount="indefinite" rotate="0">
-            <mpath href="#drift-train"/>
+        {/* 3D Realistic Assets traversing the structured routes */}
+        
+        {/* Premium Top-Down Train Vector */}
+        <g>
+          <animateMotion dur="25s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#route-train"/>
           </animateMotion>
-        </image>
+          <g transform="scale(1.5)">
+            <rect x="-24" y="-8" width="48" height="16" rx="8" fill="#1E88E5" opacity="0.3" filter="blur(4px)" />
+            <rect x="-20" y="-6" width="40" height="12" rx="6" fill="#1E88E5" />
+            <path d="M 10 -4 L 16 -2 L 16 2 L 10 4 Z" fill="#ffffff" />
+            <rect x="-14" y="-2" width="20" height="4" rx="2" fill="#ffffff" opacity="0.4" />
+          </g>
+        </g>
 
-        {/* 3D Giant Bus */}
-        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Bus/3D/bus_3d.png" width="160" height="160" x="-80" y="-80" opacity="0.75" style={{ filter: 'drop-shadow(0px 20px 30px rgba(255,107,53,0.2))' }}>
-          <animateMotion dur="65s" repeatCount="indefinite" rotate="0">
-            <mpath href="#drift-bus"/>
+        {/* Premium Top-Down Bus Vector */}
+        <g>
+          <animateMotion dur="35s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#route-bus"/>
           </animateMotion>
-        </image>
+          <g transform="scale(1.5)">
+            <rect x="-20" y="-10" width="40" height="20" rx="6" fill="#FF6B35" opacity="0.3" filter="blur(4px)" />
+            <rect x="-16" y="-8" width="32" height="16" rx="4" fill="#FF6B35" />
+            <rect x="10" y="-6" width="4" height="12" rx="1.5" fill="#ffffff" />
+            <rect x="-12" y="-5" width="18" height="10" rx="2" fill="#000000" opacity="0.1" />
+          </g>
+        </g>
 
-        {/* 3D Giant Airplane */}
-        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Airplane/3D/airplane_3d.png" width="200" height="200" x="-100" y="-100" opacity="0.5" style={{ filter: 'drop-shadow(0px 30px 40px rgba(83,74,183,0.15))' }}>
-          <animateMotion dur="75s" repeatCount="indefinite" rotate="0">
-            <mpath href="#drift-plane"/>
+        {/* Premium Top-Down Traveler Vector */}
+        <g>
+          <animateMotion dur="45s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#route-human"/>
           </animateMotion>
-        </image>
-
-        {/* 3D Giant Scooter */}
-        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Motor%20scooter/3D/motor_scooter_3d.png" width="140" height="140" x="-70" y="-70" opacity="0.65" style={{ filter: 'drop-shadow(0px 20px 30px rgba(255,107,53,0.15))' }}>
-          <animateMotion dur="55s" repeatCount="indefinite" rotate="0">
-            <mpath href="#drift-scooter"/>
-          </animateMotion>
-        </image>
-
-        {/* 3D Giant Traveler / Human */}
-        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Person%20walking/Default/3D/person_walking_3d_default.png" width="130" height="130" x="-65" y="-65" opacity="0.6" style={{ filter: 'drop-shadow(0px 15px 20px rgba(30,136,229,0.2))' }}>
-          <animateMotion dur="85s" repeatCount="indefinite" rotate="0">
-            <mpath href="#drift-human"/>
-          </animateMotion>
-        </image>
+          <g transform="scale(1.5)">
+            <circle cx="0" cy="0" r="14" fill="#534AB7" opacity="0.3" filter="blur(3px)" />
+            <rect x="-6" y="-7" width="10" height="14" rx="5" fill="#534AB7" />
+            <circle cx="2" cy="0" r="5" fill="#ffffff" />
+          </g>
+        </g>
       </svg>
 
       {/* 3. Central Login Container */}

@@ -270,30 +270,30 @@ function LoginForm({
         </defs>
         
         {/* Hub Connection Lines (Triangle Network) */}
-        <path d="M 250 450 L 750 350 L 600 750 Z" fill="none" stroke="url(#pathGrad)" strokeWidth="0.5" strokeDasharray="4 4" opacity="0.5" />
+        <path d="M 450 200 L 650 500 L 350 800 Z" fill="none" stroke="url(#pathGrad)" strokeWidth="0.5" strokeDasharray="4 4" opacity="0.5" />
 
         {/* Animated Background Paths intersecting exactly at Hubs */}
-        {/* Train Route: Originates bottom-left, through Hub 1, to Hub 2, exits top-right */}
-        <path id="route-train" d="M -100 800 C 0 600, 100 500, 250 450 S 550 380, 750 350 S 1000 250, 1100 150" fill="none" stroke="url(#pathGrad)" strokeWidth="1.5" strokeDasharray="6 6" opacity="0.8" />
+        {/* Train Route: Top-Left to Bottom-Right */}
+        <path id="route-train" d="M 150 -100 C 250 0, 350 100, 450 200 S 550 400, 650 500 S 850 800, 950 1100" fill="none" stroke="url(#pathGrad)" strokeWidth="1.5" strokeDasharray="6 6" opacity="0.8" />
         
-        {/* Bus Route: Originates top-left, through Hub 1, to Hub 3, exits bottom-right */}
-        <path id="route-bus" d="M 100 -100 C 150 100, 200 200, 250 450 S 400 700, 600 750 S 900 850, 1100 900" fill="none" stroke="url(#pathGrad2)" strokeWidth="1.5" strokeDasharray="8 8" opacity="0.8" />
+        {/* Bus Route: Top-Right to Bottom-Left */}
+        <path id="route-bus" d="M 850 -100 C 750 100, 700 350, 650 500 S 450 650, 350 800 S 150 1000, 50 1100" fill="none" stroke="url(#pathGrad2)" strokeWidth="1.5" strokeDasharray="8 8" opacity="0.8" />
         
-        {/* Human Route: Originates top-right, down to Hub 2, to Hub 3, exits bottom-left */}
-        <path id="route-human" d="M 900 -100 C 850 150, 800 200, 750 350 S 650 600, 600 750 S 300 950, -100 1000" fill="none" stroke="url(#pathGrad)" strokeWidth="1" strokeDasharray="4 4" opacity="0.6" />
+        {/* Human Route: Bottom-Left to Top-Right sweeping through West */}
+        <path id="route-human" d="M 150 1100 C 250 1000, 300 900, 350 800 S 300 300, 450 200 S 650 0, 750 -100" fill="none" stroke="url(#pathGrad)" strokeWidth="1" strokeDasharray="4 4" opacity="0.6" />
 
         {/* Major City Hubs (Glowing Nodes) */}
-        {/* Hub 1 (West) */}
-        <circle cx="250" cy="450" r="6" fill="#1E88E5" />
-        <motion.circle cx="250" cy="450" r="24" fill="none" stroke="#1E88E5" strokeWidth="2" animate={{ scale: [1, 1.8], opacity: [0.6, 0] }} transition={{ duration: 3, repeat: Infinity }} />
+        {/* Hub 1 (North) */}
+        <circle cx="450" cy="200" r="6" fill="#1E88E5" />
+        <motion.circle cx="450" cy="200" r="24" fill="none" stroke="#1E88E5" strokeWidth="2" animate={{ scale: [1, 1.8], opacity: [0.6, 0] }} transition={{ duration: 3, repeat: Infinity }} />
         
-        {/* Hub 2 (East) */}
-        <circle cx="750" cy="350" r="8" fill="#534AB7" />
-        <motion.circle cx="750" cy="350" r="30" fill="none" stroke="#534AB7" strokeWidth="2" animate={{ scale: [1, 2], opacity: [0.5, 0] }} transition={{ duration: 4, repeat: Infinity, delay: 1 }} />
+        {/* Hub 2 (Center East) */}
+        <circle cx="650" cy="500" r="8" fill="#534AB7" />
+        <motion.circle cx="650" cy="500" r="30" fill="none" stroke="#534AB7" strokeWidth="2" animate={{ scale: [1, 2], opacity: [0.5, 0] }} transition={{ duration: 4, repeat: Infinity, delay: 1 }} />
         
         {/* Hub 3 (South) */}
-        <circle cx="600" cy="750" r="5" fill="#D4537E" />
-        <motion.circle cx="600" cy="750" r="20" fill="none" stroke="#D4537E" strokeWidth="1" animate={{ scale: [1, 1.5], opacity: [0.8, 0] }} transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 }} />
+        <circle cx="350" cy="800" r="5" fill="#D4537E" />
+        <motion.circle cx="350" cy="800" r="20" fill="none" stroke="#D4537E" strokeWidth="1" animate={{ scale: [1, 1.5], opacity: [0.8, 0] }} transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 }} />
 
         {/* 3D Realistic Assets traversing the structured routes */}
         

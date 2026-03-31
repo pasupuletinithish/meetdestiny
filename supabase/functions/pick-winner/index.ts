@@ -19,7 +19,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { vehicle_id } = await req.json()
+    const { vehicle_id, manual_winner_id } = await req.json()
     if (!vehicle_id) throw new Error('vehicle_id is required')
 
     const dayOfWeek = new Date().getDay()
@@ -50,7 +50,10 @@ serve(async (req) => {
     let winnerId: string | null = null
     let winnerScore = 0
 
-    if (contestType.criteria === 'random') {
+    if (manual_winner_id) {
+      winnerId = manual_winner_id
+      winnerScore = 999 // Mark manual wins with 999
+    } else if (contestType.criteria === 'random') {
       winnerId = checkins[Math.floor(Math.random() * checkins.length)].user_id
       winnerScore = 1
     } else if (contestType.criteria === 'pings_sent') {

@@ -212,6 +212,8 @@ export const AdminPanel: React.FC = () => {
   const [savingCoupons, setSavingCoupons] = useState(false);
   const [triggeringWinner, setTriggeringWinner] = useState<string | null>(null);
   const [contestVehicleId, setContestVehicleId] = useState('');
+  const [vehicleTravelers, setVehicleTravelers] = useState<any[]>([]);
+  const [searchingTravelers, setSearchingTravelers] = useState(false);
 
   const [form, setForm] = useState({
     operator: '',
@@ -395,6 +397,39 @@ export const AdminPanel: React.FC = () => {
         await fetchWinners();
         await fetchCoupons();
         setContestVehicleId('');
+      } else {
+        toast.info(data?.message || 'No winner picked');
+      }
+    } catch (err: any) {
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setTriggeringWinner(null);
+    }
+  };
+
+  const handleSearchTravelers = async () => {
+    if (!contestVehicleId.trim()) { toast.error('Enter a vehicle ID first'); return; }
+    setSearchingTravelers(true);
+    const { data, error } = await supabase.from('checkins').select('user_id, name').eq('vehicle_id', contestVehicleId.trim());
+    if (error) { toast.error('Failed to search'); }
+    else if (!data || data.length === 0) { toast.info('No active travelers found on this vehicle'); setVehicleTravelers([]); }
+    else { setVehicleTravelers(data); toast.success(`Found ${data.length} traveler(s)`); }
+    setSearchingTravelers(false);
+  };
+
+  const handlePickManualWinner = async (userId: string) => {
+    setTriggeringWinner(contestVehicleId);
+    try {
+      const { data, error } = await supabase.functions.invoke('pick-winner', {
+        body: { vehicle_id: contestVehicleId.trim(), manual_winner_id: userId }
+      });
+      if (error) throw error;
+      if (data?.winner) {
+        toast.success(`🏆 Winner: ${data.winner.name} — ${data.contest} (Manual override)`);
+        await fetchWinners();
+        await fetchCoupons();
+        setContestVehicleId('');
+        setVehicleTravelers([]);
       } else {
         toast.info(data?.message || 'No winner picked');
       }
@@ -830,17 +865,40 @@ export const AdminPanel: React.FC = () => {
               <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
                 <Trophy size={13} /> Manually Pick Winner
               </p>
-              <p className="text-xs text-slate-400 mb-3">Enter a vehicle ID to manually trigger winner selection for that journey.</p>
+              <p className="text-xs text-slate-400 mb-3">Enter a vehicle ID to manually trigger or override winner selection for that journey.</p>
               <div className="flex gap-2">
                 <input type="text" placeholder="e.g. BAN-CHE-0101"
-                  value={contestVehicleId} onChange={e => setContestVehicleId(e.target.value.toUpperCase())}
+                  value={contestVehicleId} onChange={e => { setContestVehicleId(e.target.value.toUpperCase()); setVehicleTravelers([]); }}
                   className="flex-1 h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-mono outline-none focus:border-yellow-400" />
+                <button onClick={handleSearchTravelers} disabled={searchingTravelers || !contestVehicleId.trim()}
+                  className="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl disabled:opacity-50 flex items-center gap-1.5 text-sm">
+                  {searchingTravelers ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  Find
+                </button>
                 <button onClick={handleTriggerWinner} disabled={!!triggeringWinner || !contestVehicleId.trim()}
                   className="px-4 py-2 bg-yellow-400 text-white font-bold rounded-xl disabled:opacity-50 flex items-center gap-1.5 text-sm">
-                  {triggeringWinner ? <Loader2 size={14} className="animate-spin" /> : <Trophy size={14} />}
-                  Pick
+                  {triggeringWinner && vehicleTravelers.length === 0 ? <Loader2 size={14} className="animate-spin" /> : <Trophy size={14} />}
+                  Auto Pick
                 </button>
               </div>
+              
+              {/* Traveler List for Manual Override */}
+              {vehicleTravelers.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <p className="text-xs font-bold text-slate-600 mb-2">Select a traveler to override and Crown as Winner:</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {vehicleTravelers.map(t => (
+                      <div key={t.user_id} className="flex items-center justify-between bg-slate-50 border border-slate-100 p-2 rounded-lg">
+                        <span className="text-sm font-bold text-slate-700">{t.name}</span>
+                        <button onClick={() => handlePickManualWinner(t.user_id)} disabled={!!triggeringWinner}
+                          className="px-3 py-1.5 bg-yellow-100 text-yellow-600 hover:bg-yellow-400 hover:text-white transition-colors text-xs font-bold rounded-lg flex items-center gap-1">
+                          {triggeringWinner === contestVehicleId ? <Loader2 size={12} className="animate-spin" /> : 'Crown'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Winners history */}

@@ -283,7 +283,7 @@ await supabase.functions.invoke('pick-winner', {
             if (pinger) {
               toast.success(`${pinger.name} pinged you! 👋`);
               const { data: mutualPing } = await supabase.from('pings').select('*')
-                .eq('from_user_id', user.id).eq('to_user_id', payload.new.from_user_id).single();
+                .eq('from_user_id', user.id).eq('to_user_id', payload.new.from_user_id).maybeSingle();
               if (mutualPing) { setMatchedUser(pinger); setShowMatchModal(true); }
             }
           }

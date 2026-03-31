@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Send, Lock, Loader2, Check, CheckCheck, Flag, Ban, MoreVertical, X } from 'lucide-react';
+import { ArrowLeft, Send, Lock, Loader2, Check, CheckCheck, Flag, Ban, MoreVertical, X, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { notify } from '../../lib/notifications';
@@ -359,6 +359,12 @@ export const PrivateChat: React.FC = () => {
         {showMenu && (
           <motion.div initial={{ opacity: 0, scale: 0.95, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -8 }}
             style={{ position: 'absolute', top: 70, right: 16, zIndex: 50, background: '#fff', borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.12)', border: '1px solid rgba(148,163,184,0.15)', overflow: 'hidden', minWidth: 180 }}>
+            <motion.button whileTap={{ scale: 0.97 }}
+              onClick={() => { setShowMenu(false); navigate('/profile', { state: { user: traveler } }); }}
+              style={{ width: '100%', padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#0f172a', fontWeight: 500 }}>
+              <User style={{ width: 15, height: 15, color: '#64748b' }} /> View Profile
+            </motion.button>
+            <div style={{ height: 1, background: 'rgba(148,163,184,0.1)' }} />
             <motion.button whileTap={{ scale: 0.97 }}
               onClick={() => { setShowMenu(false); setShowReportModal(true); setReportReason(''); }}
               style={{ width: '100%', padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#ef4444', fontWeight: 500 }}>

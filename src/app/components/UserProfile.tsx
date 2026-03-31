@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft, Briefcase, MapPin, Bus, Zap, MessageCircle,
-  Radio, User as UserIcon, LogOut, RefreshCw, Trash2,
-  Shield, ChevronRight, Loader2, Clock, Users, Gamepad2
+  Radio, UserIcon as UserIcon, LogOut, RefreshCw, Trash2,
+  Shield, ChevronRight, Loader2, Clock, Users, Gamepad2, UserPlus, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -94,6 +94,9 @@ export const UserProfile: React.FC = () => {
   const [friendsCount, setFriendsCount] = useState(0);
   const [pingLoading, setPingLoading] = useState(false);
   const [alreadyPinged, setAlreadyPinged] = useState(false);
+  const [isFriend, setIsFriend] = useState(false);
+  const [friendRequested, setFriendRequested] = useState(false);
+  const [friendLoading, setFriendLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
@@ -113,6 +116,15 @@ export const UserProfile: React.FC = () => {
       } else {
         const { data: existingPing } = await supabase.from('pings').select('id').eq('from_user_id', user.id).eq('to_user_id', viewingCheckin!.user_id).maybeSingle();
         setAlreadyPinged(!!existingPing);
+        
+        const { data: existingFriend } = await supabase.from('friends').select('status')
+          .or(`and(requester_id.eq.${user.id},receiver_id.eq.${viewingCheckin!.user_id}),and(requester_id.eq.${viewingCheckin!.user_id},receiver_id.eq.${user.id})`)
+          .maybeSingle();
+
+        if (existingFriend) {
+          if (existingFriend.status === 'accepted') setIsFriend(true);
+          else setFriendRequested(true);
+        }
       }
       setLoading(false);
     };
@@ -165,6 +177,42 @@ export const UserProfile: React.FC = () => {
       notify.ping(viewingCheckin.user_id, myCheckin?.name || 'Someone');
     }
     setPingLoading(false);
+  };
+
+  const handleAddFriend = async () => {
+    if (!viewingCheckin || !currentUserId) return;
+    setFriendLoading(true);
+    try {
+      const { data: myCheckin } = await supabase
+        .from('checkins').select('name, profession, vehicle_id')
+        .eq('user_id', currentUserId).eq('is_active', true)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        
+      if (!myCheckin) {
+        toast.error('You need an active journey to add friends');
+        return;
+      }
+
+      const { error } = await supabase.from('friends').insert({
+        requester_id: currentUserId,
+        receiver_id: viewingCheckin.user_id,
+        requester_name: myCheckin.name,
+        receiver_name: viewingCheckin.name,
+        requester_profession: myCheckin.profession,
+        receiver_profession: viewingCheckin.profession,
+        connected_on_vehicle: myCheckin.vehicle_id || viewingCheckin.vehicle_id || '',
+        status: 'pending',
+      });
+
+      if (error) throw error;
+      setFriendRequested(true);
+      toast.success(`Friend request sent to ${viewingCheckin.name}! 🎉`);
+      notify.friendRequest(viewingCheckin.user_id, myCheckin.name);
+    } catch {
+      toast.error('Failed to send friend request');
+    } finally {
+      setFriendLoading(false);
+    }
   };
 
   const handleSignOut = async () => { await supabase.auth.signOut(); toast.success('Signed out'); navigate('/'); };
@@ -338,6 +386,14 @@ export const UserProfile: React.FC = () => {
           {!isOwnProfile && (
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
               style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+              <motion.button whileTap={{ scale: 0.97 }} onClick={handleAddFriend}
+                disabled={isFriend || friendRequested || friendLoading}
+                style={{ width: '100%', padding: '13px', borderRadius: 14, border: 'none', cursor: (isFriend || friendRequested) ? 'default' : 'pointer', background: (isFriend || friendRequested) ? 'rgba(34,197,94,0.12)' : 'linear-gradient(135deg, #1E88E5, #1565C0)', boxShadow: (isFriend || friendRequested) ? 'none' : '0 6px 20px rgba(30,136,229,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {friendLoading ? <Loader2 style={{ width: 17, height: 17, color: '#fff' }} className="animate-spin" /> : <UserPlus style={{ width: 17, height: 17, color: (isFriend || friendRequested) ? '#16a34a' : '#fff' }} />}
+                <span style={{ fontSize: 14, fontWeight: 700, color: (isFriend || friendRequested) ? '#16a34a' : '#fff' }}>{isFriend ? '✓ Friends' : friendRequested ? '✓ Request Sent' : `Add ${displayName.split(' ')[0]} as Friend`}</span>
+              </motion.button>
+
               <motion.button whileTap={{ scale: 0.97 }} onClick={handlePing} disabled={alreadyPinged || pingLoading}
                 style={{ width: '100%', padding: '13px', borderRadius: 14, border: 'none', cursor: alreadyPinged ? 'default' : 'pointer', background: alreadyPinged ? 'rgba(34,197,94,0.12)' : 'linear-gradient(135deg, #FF6B35, #E85A2B)', boxShadow: alreadyPinged ? 'none' : '0 6px 20px rgba(255,107,53,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 {pingLoading ? <Loader2 style={{ width: 17, height: 17, color: '#fff' }} className="animate-spin" /> : <Zap style={{ width: 17, height: 17, color: alreadyPinged ? '#16a34a' : '#fff' }} fill={alreadyPinged ? '#16a34a' : 'none'} />}

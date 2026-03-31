@@ -42,116 +42,41 @@ interface UserProfileData {
 function ProfileBanner({ name, profession, vibe, isOwn }: {
   name: string; profession: string; vibe: typeof vibeOptions[0]; isOwn: boolean;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef<number>(0);
-  const progressRef = useRef(0);
-  const initials = name.split(' ').map((n: string) => n[0]).join('');
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
-    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-    const w = canvas.offsetWidth;
-    const h = canvas.offsetHeight;
-    const ax = 30, ay = h * 0.75;
-    const bx = w - 30, by = h * 0.2;
-    const mx = w * 0.5, my = h * 0.48;
-    const acx = w * 0.28, acy = h * 0.38;
-    const bcx = w * 0.72, bcy = h * 0.62;
-
-    function getBezierPoint(t: number, x0: number, y0: number, cx: number, cy: number, x1: number, y1: number) {
-      return { x: (1-t)*(1-t)*x0 + 2*(1-t)*t*cx + t*t*x1, y: (1-t)*(1-t)*y0 + 2*(1-t)*t*cy + t*t*y1 };
-    }
-
-    let phase = 0;
-    function draw() {
-      progressRef.current = Math.min(progressRef.current + 0.008, 1);
-      const p = progressRef.current;
-      ctx.clearRect(0, 0, w, h);
-      if (p < 0.3) phase = 0; else if (p < 0.75) phase = 1; else if (p < 0.88) phase = 2; else phase = 3;
-      const pathP = Math.min(p / 0.3, 1);
-      const moveP = phase >= 1 ? Math.min((p - 0.3) / 0.45, 1) : 0;
-      const burstP = phase >= 2 ? Math.min((p - 0.75) / 0.13, 1) : 0;
-      const easePathP = pathP < 0.5 ? 2*pathP*pathP : -1+(4-2*pathP)*pathP;
-
-      ctx.beginPath();
-      for (let i = 0; i <= 30; i++) { const t = (i/30)*easePathP; const pt = getBezierPoint(t, ax, ay, acx, acy, mx, my); i===0?ctx.moveTo(pt.x,pt.y):ctx.lineTo(pt.x,pt.y); }
-      ctx.strokeStyle = 'rgba(30,136,229,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
-
-      ctx.beginPath();
-      for (let i = 0; i <= 30; i++) { const t = (i/30)*easePathP; const pt = getBezierPoint(t, bx, by, bcx, bcy, mx, my); i===0?ctx.moveTo(pt.x,pt.y):ctx.lineTo(pt.x,pt.y); }
-      ctx.strokeStyle = 'rgba(255,107,53,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
-
-      const easeMoveP = moveP < 0.5 ? 4*moveP*moveP*moveP : 1-Math.pow(-2*moveP+2,3)/2;
-      if (phase >= 1 && moveP < 1) {
-        const pA = getBezierPoint(easeMoveP, ax, ay, acx, acy, mx, my);
-        ctx.beginPath(); ctx.arc(pA.x, pA.y, 6, 0, Math.PI*2); ctx.fillStyle='#1E88E5'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
-        for (let i=1;i<=5;i++) { const t2=Math.max(0,easeMoveP-i*0.06); const trail=getBezierPoint(t2,ax,ay,acx,acy,mx,my); ctx.beginPath(); ctx.arc(trail.x,trail.y,3-i*0.4,0,Math.PI*2); ctx.fillStyle=`rgba(30,136,229,${0.25-i*0.04})`; ctx.fill(); }
-        const pB = getBezierPoint(easeMoveP, bx, by, bcx, bcy, mx, my);
-        ctx.beginPath(); ctx.arc(pB.x, pB.y, 6, 0, Math.PI*2); ctx.fillStyle='#FF6B35'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
-        for (let i=1;i<=5;i++) { const t2=Math.max(0,easeMoveP-i*0.06); const trail=getBezierPoint(t2,bx,by,bcx,bcy,mx,my); ctx.beginPath(); ctx.arc(trail.x,trail.y,3-i*0.4,0,Math.PI*2); ctx.fillStyle=`rgba(255,107,53,${0.25-i*0.04})`; ctx.fill(); }
-      }
-
-      if (phase >= 2) {
-        const bScale = burstP < 0.5 ? burstP*2 : 1;
-        const bAlpha = burstP > 0.8 ? 1-(burstP-0.8)/0.2*0.3 : 1;
-        const grad = ctx.createRadialGradient(mx,my,0,mx,my,28*bScale);
-        grad.addColorStop(0,`rgba(255,215,0,${0.5*bAlpha})`); grad.addColorStop(1,'rgba(255,215,0,0)');
-        ctx.beginPath(); ctx.arc(mx,my,28*bScale,0,Math.PI*2); ctx.fillStyle=grad; ctx.fill();
-        ctx.beginPath(); ctx.arc(mx,my,8*bScale,0,Math.PI*2); ctx.fillStyle=`rgba(255,215,0,${bAlpha})`; ctx.fill();
-        ctx.strokeStyle=`rgba(255,255,255,${bAlpha})`; ctx.lineWidth=1.5; ctx.stroke();
-        [0,45,90,135,180,225,270,315].forEach((angle,i) => {
-          const rad=(angle*Math.PI)/180; const len=14*bScale;
-          ctx.beginPath(); ctx.moveTo(mx+Math.cos(rad)*10*bScale,my+Math.sin(rad)*10*bScale); ctx.lineTo(mx+Math.cos(rad)*(10+len)*bScale,my+Math.sin(rad)*(10+len)*bScale);
-          ctx.strokeStyle=i%2===0?`rgba(30,136,229,${bAlpha*0.9})`:`rgba(255,107,53,${bAlpha*0.9})`; ctx.lineWidth=1.5; ctx.stroke();
-        });
-        [[-22,-16],[20,-18],[-18,20],[22,16],[0,-26],[0,26]].forEach(([dx,dy],i) => {
-          ctx.beginPath(); ctx.arc(mx+dx!*bScale,my+dy!*bScale,2.5*bScale,0,Math.PI*2);
-          ctx.fillStyle=i%2===0?`rgba(255,215,0,${bAlpha*0.8})`:`rgba(255,255,255,${bAlpha*0.6})`; ctx.fill();
-        });
-      }
-      if (p >= 1) progressRef.current = 0;
-      animRef.current = requestAnimationFrame(draw);
-    }
-    animRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animRef.current);
-  }, []);
+  const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, #1E88E5 0%, #1565C0 100%)', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-      <div style={{ position: 'absolute', bottom: -15, left: -15, width: 90, height: 90, borderRadius: '50%', background: 'rgba(255,107,53,0.12)' }} />
-      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: 80, position: 'relative', zIndex: 1 }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '0 20px 18px', position: 'relative', zIndex: 2 }}>
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <motion.div animate={{ boxShadow: [`0 0 0 3px ${vibe.color}80`,`0 0 0 6px ${vibe.color}20`,`0 0 0 3px ${vibe.color}80`] }} transition={{ duration: 2, repeat: Infinity }}
-            style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: `2.5px solid ${vibe.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{initials}</span>
-          </motion.div>
-          <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 2, repeat: Infinity }}
-            style={{ position: 'absolute', bottom: 1, right: 1, width: 17, height: 17, borderRadius: '50%', background: vibe.color, border: '2px solid white', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {vibe.emoji}
-          </motion.div>
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#fff', margin: '0 0 2px', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</h1>
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '0 0 5px' }}>{profession}</p>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.12)', borderRadius: 14, padding: '3px 10px', marginBottom: '10px' }}>
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: vibe.color }} />
-            <span style={{ fontSize: 10, color: '#fff', fontWeight: 500 }}>{vibe.label}</span>
+    <AdSlot variant="cover">
+      <div style={{ paddingTop: 46, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', position: 'relative', zIndex: 10 }}>
+        {/* Profile Info Left */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: `2px solid ${vibe.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{initials}</span>
+            </div>
+            <div style={{ position: 'absolute', bottom: -2, right: -2, width: 14, height: 14, borderRadius: '50%', background: vibe.color, border: '2px solid white', fontSize: 7, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {vibe.emoji}
+            </div>
           </div>
-          <AdSlot variant="mini" />
-        </div>
-        {isOwn && (
-          <div style={{ background: 'linear-gradient(135deg, #FF6B35, #E85A2B)', borderRadius: 16, padding: '4px 10px', flexShrink: 0 }}>
-            <span style={{ fontSize: 10, color: '#fff', fontWeight: 700 }}>✦ You</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <h1 style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.02em', textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>{name}</h1>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>{profession}</p>
           </div>
-        )}
+        </div>
+        
+        {/* Right side labels */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+           {isOwn && (
+             <div style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 12, padding: '3px 8px', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+               <span style={{ fontSize: 9, color: '#fff', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' }}>You</span>
+             </div>
+           )}
+           <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: '3px 8px', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)' }}>
+             <div style={{ width: 5, height: 5, borderRadius: '50%', background: vibe.color, boxShadow: `0 0 6px ${vibe.color}` }} />
+             <span style={{ fontSize: 9, color: '#fff', fontWeight: 600 }}>{vibe.label}</span>
+           </div>
+        </div>
       </div>
-    </div>
+    </AdSlot>
   );
 }
 

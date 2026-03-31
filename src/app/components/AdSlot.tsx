@@ -22,10 +22,11 @@ const ads = [
 ];
 
 interface AdSlotProps {
-  variant?: 'default' | 'mini';
+  variant?: 'default' | 'mini' | 'cover';
+  children?: React.ReactNode;
 }
 
-export const AdSlot: React.FC<AdSlotProps> = ({ variant = 'default' }) => {
+export const AdSlot: React.FC<AdSlotProps> = ({ variant = 'default', children }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
@@ -35,49 +36,63 @@ export const AdSlot: React.FC<AdSlotProps> = ({ variant = 'default' }) => {
     return () => clearInterval(timer);
   }, []);
 
+  const isCover = variant === 'cover';
+
   return (
-    <div style={{ position: 'relative', width: '100%', borderRadius: 16, overflow: 'hidden', boxShadow: '0 8px 20px rgba(0,0,0,0.08)' }}>
+    <div style={{ position: 'relative', width: '100%', borderRadius: isCover ? 0 : 16, overflow: 'hidden', boxShadow: isCover ? 'none' : '0 8px 20px rgba(0,0,0,0.08)' }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
-          initial={{ opacity: 0, scale: 0.98 }}
+          initial={{ opacity: 0, scale: isCover ? 1 : 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
           style={{ 
             background: ads[currentIndex].bg, 
-            padding: '14px 16px', 
+            padding: isCover ? '14px 16px 24px' : '14px 16px', 
             display: 'flex', 
-            alignItems: 'center', 
+            flexDirection: isCover ? 'column' : 'row',
+            alignItems: isCover ? 'stretch' : 'center', 
             gap: 12,
             cursor: 'pointer'
           }}
         >
           {/* Ad Badge */}
-          <div style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(4px)', padding: '3px 10px', borderBottomLeftRadius: 12, fontSize: 9, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(4px)', padding: '3px 10px', borderBottomLeftRadius: 12, fontSize: 9, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em', zIndex: 10 }}>
             Featured
           </div>
 
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {ads[currentIndex].icon}
-          </div>
+          {/* Top children area (e.g. for profile info) */}
+          {children && (
+            <div style={{ position: 'relative', zIndex: 5 }}>
+              {children}
+            </div>
+          )}
 
-          <div style={{ flex: 1, minWidth: 0, paddingRight: 4 }}>
-            <h4 style={{ fontSize: 14, fontWeight: 800, color: '#fff', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {ads[currentIndex].title}
-            </h4>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.3 }}>
-              {ads[currentIndex].subtitle}
-            </p>
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: children && isCover ? 8 : 0 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {ads[currentIndex].icon}
+            </div>
 
-          <motion.button 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            style={{ padding: '6px 14px', borderRadius: 20, background: '#fff', color: ads[currentIndex].btn, border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', flexShrink: 0 }}
-          >
-            Explore
-          </motion.button>
+            <div style={{ flex: 1, minWidth: 0, paddingRight: 4 }}>
+              <h4 style={{ fontSize: 14, fontWeight: 800, color: '#fff', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {ads[currentIndex].title}
+              </h4>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.3 }}>
+                {ads[currentIndex].subtitle}
+              </p>
+            </div>
+
+            {variant !== 'mini' && (
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                style={{ padding: '6px 14px', borderRadius: 20, background: '#fff', color: ads[currentIndex].btn, border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', flexShrink: 0 }}
+              >
+                Explore
+              </motion.button>
+            )}
+          </div>
         </motion.div>
       </AnimatePresence>
     </div>

@@ -269,12 +269,33 @@ function LoginForm({
           </linearGradient>
         </defs>
         
-        {/* Animated Background Paths */}
-        <path id="route-train" d="M -200 300 Q 300 500, 600 200 T 1200 400" fill="none" stroke="url(#pathGrad)" strokeWidth="1.5" strokeDasharray="6 6" />
-        <path id="route-bus" d="M -100 850 Q 500 650, 700 950 T 1200 600" fill="none" stroke="url(#pathGrad2)" strokeWidth="1.5" strokeDasharray="8 8" />
-        <path id="route-human" d="M 400 -100 Q 500 400, 300 600 T 600 1200" fill="none" stroke="url(#pathGrad)" strokeWidth="1" strokeDasharray="4 4" />
+        {/* Hub Connection Lines (Triangle Network) */}
+        <path d="M 250 450 L 750 350 L 600 750 Z" fill="none" stroke="url(#pathGrad)" strokeWidth="0.5" strokeDasharray="4 4" opacity="0.5" />
 
-        {/* 3D Realistic Assets traversing the routes using zero-JS SVG animateMotion */}
+        {/* Animated Background Paths intersecting exactly at Hubs */}
+        {/* Train Route: Originates bottom-left, through Hub 1, to Hub 2, exits top-right */}
+        <path id="route-train" d="M -100 800 C 0 600, 100 500, 250 450 S 550 380, 750 350 S 1000 250, 1100 150" fill="none" stroke="url(#pathGrad)" strokeWidth="1.5" strokeDasharray="6 6" opacity="0.8" />
+        
+        {/* Bus Route: Originates top-left, through Hub 1, to Hub 3, exits bottom-right */}
+        <path id="route-bus" d="M 100 -100 C 150 100, 200 200, 250 450 S 400 700, 600 750 S 900 850, 1100 900" fill="none" stroke="url(#pathGrad2)" strokeWidth="1.5" strokeDasharray="8 8" opacity="0.8" />
+        
+        {/* Human Route: Originates top-right, down to Hub 2, to Hub 3, exits bottom-left */}
+        <path id="route-human" d="M 900 -100 C 850 150, 800 200, 750 350 S 650 600, 600 750 S 300 950, -100 1000" fill="none" stroke="url(#pathGrad)" strokeWidth="1" strokeDasharray="4 4" opacity="0.6" />
+
+        {/* Major City Hubs (Glowing Nodes) */}
+        {/* Hub 1 (West) */}
+        <circle cx="250" cy="450" r="6" fill="#1E88E5" />
+        <motion.circle cx="250" cy="450" r="24" fill="none" stroke="#1E88E5" strokeWidth="2" animate={{ scale: [1, 1.8], opacity: [0.6, 0] }} transition={{ duration: 3, repeat: Infinity }} />
+        
+        {/* Hub 2 (East) */}
+        <circle cx="750" cy="350" r="8" fill="#534AB7" />
+        <motion.circle cx="750" cy="350" r="30" fill="none" stroke="#534AB7" strokeWidth="2" animate={{ scale: [1, 2], opacity: [0.5, 0] }} transition={{ duration: 4, repeat: Infinity, delay: 1 }} />
+        
+        {/* Hub 3 (South) */}
+        <circle cx="600" cy="750" r="5" fill="#D4537E" />
+        <motion.circle cx="600" cy="750" r="20" fill="none" stroke="#D4537E" strokeWidth="1" animate={{ scale: [1, 1.5], opacity: [0.8, 0] }} transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 }} />
+
+        {/* 3D Realistic Assets traversing the structured routes */}
         
         {/* Premium Top-Down Train Vector */}
         <g>
@@ -307,11 +328,6 @@ function LoginForm({
           <rect x="-6" y="-7" width="10" height="14" rx="5" fill="#534AB7" />
           <circle cx="2" cy="0" r="5" fill="#ffffff" />
         </g>
-
-        {/* Networking Pulse Nodes */}
-        <motion.circle cx="600" cy="200" r="4" fill="#534AB7" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 3, repeat: Infinity }} />
-        <motion.circle cx="600" cy="200" r="16" fill="none" stroke="#534AB7" strokeWidth="1" animate={{ scale: [1, 2.5], opacity: [0.6, 0] }} transition={{ duration: 3, repeat: Infinity }} />
-        <motion.circle cx="300" cy="600" r="3" fill="#D4537E" animate={{ scale: [1, 1.8, 1] }} transition={{ duration: 4, repeat: Infinity, delay: 1 }} />
       </svg>
 
       {/* 3. Central Login Container */}

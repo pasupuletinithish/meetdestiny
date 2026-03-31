@@ -232,69 +232,75 @@ function LoginForm({
       transition={{ duration: 1.2, ease: "easeOut" }}
       className="absolute inset-0 flex flex-col items-center justify-center font-sans overflow-hidden bg-slate-50/80"
     >
-      {/* 1. Dynamic Aurora Mesh Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+      {/* 1. Dynamic Aurora Mesh Background - Optimized for 60FPS (No heavy blurs) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 bg-[#f4f7fc]">
         <motion.div
-          className="absolute w-[600px] h-[600px] md:w-[800px] md:h-[800px] rounded-full blur-[100px] opacity-30 mix-blend-multiply"
-          style={{ background: 'radial-gradient(circle, #E3F2FD 0%, rgba(30,136,229,0) 70%)', top: '-10%', left: '-10%' }}
-          animate={{ x: [0, 100, 0], y: [0, 50, 0], scale: [1, 1.1, 1] }}
+          className="absolute rounded-full opacity-60"
+          style={{ width: '80vw', height: '80vw', top: '-20%', left: '-10%', background: 'radial-gradient(circle, rgba(30,136,229,0.15) 0%, rgba(30,136,229,0) 60%)' }}
+          animate={{ x: [0, 40, 0], y: [0, 30, 0], scale: [1, 1.05, 1] }}
           transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div
-          className="absolute w-[500px] h-[500px] md:w-[700px] md:h-[700px] rounded-full blur-[100px] opacity-20 mix-blend-multiply"
-          style={{ background: 'radial-gradient(circle, #FFE8E0 0%, rgba(255,107,53,0) 70%)', bottom: '-10%', right: '-10%' }}
-          animate={{ x: [0, -80, 0], y: [0, -60, 0], scale: [1, 1.2, 1] }}
+          className="absolute rounded-full opacity-50"
+          style={{ width: '70vw', height: '70vw', bottom: '-10%', right: '-10%', background: 'radial-gradient(circle, rgba(255,107,53,0.12) 0%, rgba(255,107,53,0) 60%)' }}
+          animate={{ x: [0, -40, 0], y: [0, -30, 0], scale: [1, 1.1, 1] }}
           transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div
-          className="absolute w-[400px] h-[400px] md:w-[500px] md:h-[500px] rounded-full blur-[100px] opacity-20 mix-blend-multiply"
-          style={{ background: 'radial-gradient(circle, #EBE9FA 0%, rgba(83,74,183,0) 70%)', top: '30%', left: '40%' }}
-          animate={{ x: [0, -40, 50, 0], y: [0, 50, -30, 0] }}
+          className="absolute rounded-full opacity-50"
+          style={{ width: '90vw', height: '90vw', top: '10%', left: '20%', background: 'radial-gradient(circle, rgba(83,74,183,0.1) 0%, rgba(83,74,183,0) 60%)' }}
+          animate={{ x: [0, -30, 40, 0], y: [0, 40, -20, 0] }}
           transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
         />
       </div>
 
-      {/* 2. Abstract Network Constellation (Animated SVG) */}
-      <svg className="absolute inset-0 w-full h-full z-0 opacity-40 pointer-events-none" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
+      {/* 2. Realistic 3D Travel Network (High Performance SVG animateMotion) */}
+      <svg className="absolute inset-0 w-full h-full z-0 opacity-60 pointer-events-none" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
         <defs>
           <linearGradient id="pathGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#1E88E5" stopOpacity="0.2" />
-            <stop offset="50%" stopColor="#534AB7" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#FF6B35" stopOpacity="0.2" />
+            <stop offset="0%" stopColor="#1E88E5" stopOpacity="0.1" />
+            <stop offset="50%" stopColor="#534AB7" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#FF6B35" stopOpacity="0.1" />
           </linearGradient>
           <linearGradient id="pathGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#FF6B35" stopOpacity="0.2" />
-            <stop offset="50%" stopColor="#D4537E" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#1E88E5" stopOpacity="0.2" />
+            <stop offset="0%" stopColor="#FF6B35" stopOpacity="0.1" />
+            <stop offset="50%" stopColor="#D4537E" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#1E88E5" stopOpacity="0.1" />
           </linearGradient>
         </defs>
         
-        {/* Animated Paths */}
-        <motion.path 
-          d="M -100 200 Q 300 400, 500 150 T 1100 300" 
-          fill="none" stroke="url(#pathGrad)" strokeWidth="1" strokeDasharray="8 8"
-          initial={{ strokeDashoffset: 1000 }} animate={{ strokeDashoffset: 0 }} 
-          transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-        />
-        <motion.path 
-          d="M -100 800 Q 400 600, 600 900 T 1100 500" 
-          fill="none" stroke="url(#pathGrad2)" strokeWidth="1.5" strokeDasharray="12 12"
-          initial={{ strokeDashoffset: 0 }} animate={{ strokeDashoffset: 1000 }} 
-          transition={{ duration: 50, repeat: Infinity, ease: "linear" }}
-        />
-        <motion.path 
-          d="M 300 -100 Q 400 400, 200 600 T 500 1100" 
-          fill="none" stroke="url(#pathGrad)" strokeWidth="0.5" 
-          initial={{ opacity: 0.2 }} animate={{ opacity: [0.2, 0.6, 0.2] }} 
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
+        {/* Animated Background Paths */}
+        <path id="route-train" d="M -200 300 Q 300 500, 600 200 T 1200 400" fill="none" stroke="url(#pathGrad)" strokeWidth="1.5" strokeDasharray="6 6" />
+        <path id="route-bus" d="M -100 850 Q 500 650, 700 950 T 1200 600" fill="none" stroke="url(#pathGrad2)" strokeWidth="1.5" strokeDasharray="8 8" />
+        <path id="route-human" d="M 400 -100 Q 500 400, 300 600 T 600 1200" fill="none" stroke="url(#pathGrad)" strokeWidth="1" strokeDasharray="4 4" />
 
-        {/* Orbiting / Pulsing Nodes */}
-        <motion.circle cx="500" cy="150" r="4" fill="#534AB7" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 3, repeat: Infinity }} />
-        <motion.circle cx="500" cy="150" r="12" fill="none" stroke="#534AB7" strokeWidth="1" animate={{ scale: [1, 2], opacity: [0.8, 0] }} transition={{ duration: 3, repeat: Infinity }} />
+        {/* 3D Realistic Assets traversing the routes using zero-JS SVG animateMotion */}
         
-        <motion.circle cx="600" cy="900" r="3" fill="#D4537E" animate={{ scale: [1, 1.8, 1] }} transition={{ duration: 4, repeat: Infinity, delay: 1 }} />
-        <motion.circle cx="200" cy="600" r="5" fill="#1E88E5" animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0.8, 0.4] }} transition={{ duration: 5, repeat: Infinity, delay: 2 }} />
+        {/* 3D Train */}
+        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/High-speed%20train/3D/high-speed_train_3d.png" width="64" height="64" x="-32" y="-32">
+          <animateMotion dur="25s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#route-train"/>
+          </animateMotion>
+        </image>
+
+        {/* 3D Bus */}
+        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Bus/3D/bus_3d.png" width="56" height="56" x="-28" y="-28">
+          <animateMotion dur="35s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#route-bus"/>
+          </animateMotion>
+        </image>
+
+        {/* 3D Human / Traveler */}
+        <image href="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Person%20walking/Default/3D/person_walking_3d_default.png" width="48" height="48" x="-24" y="-24">
+          <animateMotion dur="45s" repeatCount="indefinite" rotate="0">
+            <mpath href="#route-human"/>
+          </animateMotion>
+        </image>
+
+        {/* Networking Pulse Nodes */}
+        <motion.circle cx="600" cy="200" r="4" fill="#534AB7" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 3, repeat: Infinity }} />
+        <motion.circle cx="600" cy="200" r="16" fill="none" stroke="#534AB7" strokeWidth="1" animate={{ scale: [1, 2.5], opacity: [0.6, 0] }} transition={{ duration: 3, repeat: Infinity }} />
+        <motion.circle cx="300" cy="600" r="3" fill="#D4537E" animate={{ scale: [1, 1.8, 1] }} transition={{ duration: 4, repeat: Infinity, delay: 1 }} />
       </svg>
 
       {/* 3. Central Login Container */}

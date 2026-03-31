@@ -16,6 +16,7 @@ interface Vehicle {
   arrival_time: string;
   forward_departure: string;
   return_departure: string;
+  cooldown_hours?: number;
   stops: string[];
   bus_plate?: string;
   created_at: string;
@@ -206,6 +207,7 @@ export const AdminPanel: React.FC = () => {
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [editForwardDep, setEditForwardDep] = useState('');
   const [editReturnDep, setEditReturnDep] = useState('');
+  const [editCooldown, setEditCooldown] = useState(9);
 
   // Contest state
   const [couponInput, setCouponInput] = useState('');
@@ -223,6 +225,7 @@ export const AdminPanel: React.FC = () => {
     count: 5,
     forward_departure: '',
     return_departure: '',
+    cooldown_hours: 9,
   });
 
   useEffect(() => {
@@ -329,6 +332,7 @@ export const AdminPanel: React.FC = () => {
       arrival_time: '23:59',
       forward_departure: form.forward_departure || null,
       return_departure: form.return_departure || null,
+      cooldown_hours: form.cooldown_hours,
       stops: [],
       is_active: true,
       ai_sourced: false,
@@ -346,6 +350,7 @@ export const AdminPanel: React.FC = () => {
       forward_departure: editForwardDep || null,
       return_departure: editReturnDep || null,
       departure_time: editForwardDep || '00:00',
+      cooldown_hours: editCooldown || 9,
     }).eq('id', vehicleId);
     if (!error) { toast.success('Departure times saved! ✅'); setEditingVehicleId(null); fetchVehicles(); }
     else toast.error('Failed to save');
@@ -559,8 +564,14 @@ export const AdminPanel: React.FC = () => {
                   )}
 
                   {editingVehicleId === v.id ? (
-                    <div className="space-y-2 mt-2 pt-2 border-t border-slate-100">
-                      <p className="text-xs font-bold text-slate-600 flex items-center gap-1"><Clock size={12} /> Set Departure Times</p>
+                    <div className="space-y-3 mt-2 pt-2 border-t border-slate-100">
+                      <p className="text-xs font-bold text-slate-600 flex items-center gap-1"><Clock size={12} /> Set Trip Info</p>
+                      <div className="flex gap-2 items-center bg-blue-50/50 p-2 rounded-lg border border-blue-50">
+                        <label className="text-xs text-slate-600 font-bold w-20">Trip Cooldown</label>
+                        <input type="number" min="1" max="72" value={editCooldown} onChange={e => setEditCooldown(parseInt(e.target.value) || 9)}
+                          className="w-16 h-8 rounded-lg border border-slate-200 px-2 text-sm text-center font-mono outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" />
+                        <span className="text-xs text-slate-500">hours</span>
+                      </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">→ {v.from_location} departs</label>
@@ -573,16 +584,16 @@ export const AdminPanel: React.FC = () => {
                             className="w-full h-9 rounded-lg border border-slate-200 px-2 text-sm outline-none" />
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleSaveDepartureTimes(v.id)} className="flex-1 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl">Save Times</button>
+                      <div className="flex gap-2 pt-2">
+                        <button onClick={() => handleSaveDepartureTimes(v.id)} className="flex-1 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl">Save Changes</button>
                         <button onClick={() => setEditingVehicleId(null)} className="flex-1 py-2 bg-slate-100 text-slate-600 text-xs font-bold rounded-xl">Cancel</button>
                       </div>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditingVehicleId(v.id); setEditForwardDep(v.forward_departure || ''); setEditReturnDep(v.return_departure || ''); }}
-                      className="w-full py-1.5 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg hover:border-blue-300 hover:text-blue-500 transition-all">
-                      <Clock size={11} className="inline mr-1" />
-                      {v.forward_departure || v.return_departure ? 'Edit departure times' : 'Add departure times'}
+                    <button onClick={() => { setEditingVehicleId(v.id); setEditForwardDep(v.forward_departure || ''); setEditReturnDep(v.return_departure || ''); setEditCooldown(v.cooldown_hours || 9); }}
+                      className="w-full py-2 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg hover:border-blue-300 hover:text-blue-500 transition-all flex items-center justify-center gap-1">
+                      <Clock size={12} />
+                      {v.forward_departure || v.return_departure || v.cooldown_hours ? 'Edit route settings' : 'Add route settings'}
                     </button>
                   )}
                 </motion.div>
@@ -628,9 +639,20 @@ export const AdminPanel: React.FC = () => {
             )}
             <div className="p-4 bg-slate-50 rounded-2xl">
               <p className="text-xs font-bold text-blue-600 mb-2 uppercase">Quantity: {form.count}</p>
-              <input type="range" min="1" max="20" value={form.count} className="w-full accent-blue-600"
+              <input type="range" min="1" max="20" value={form.count} className="w-full accent-blue-600 mb-1"
                 onChange={e => setForm({ ...form, count: parseInt(e.target.value) })} />
-              <div className="flex justify-between text-xs text-slate-400 mt-1"><span>1</span><span>20</span></div>
+              <div className="flex justify-between text-xs text-slate-400"><span>1 bus</span><span>20 buses</span></div>
+            </div>
+
+            <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 shadow-inner">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-xs font-bold text-blue-800 uppercase flex items-center gap-1"><Clock size={14} /> Trip Cooldown</p>
+                <div className="bg-white px-2 py-0.5 rounded-md text-xs font-bold font-mono text-blue-600 border border-blue-200">{form.cooldown_hours} hrs</div>
+              </div>
+              <p className="text-[10px] text-blue-600/70 mb-3 font-medium">Prevents multiple winners from being picked too quickly. Usually set to the duration of the journey.</p>
+              <input type="range" min="2" max="48" step="1" value={form.cooldown_hours} className="w-full accent-blue-600 mb-1"
+                onChange={e => setForm({ ...form, cooldown_hours: parseInt(e.target.value) })} />
+              <div className="flex justify-between text-xs font-medium text-blue-600/60"><span>2 hrs</span><span>48 hrs</span></div>
             </div>
             <div className="flex gap-2">
               {['bus', 'mini-bus', 'sleeper', 'ac-sleeper'].map(type => (

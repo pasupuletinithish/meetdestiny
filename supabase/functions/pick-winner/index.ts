@@ -28,11 +28,21 @@ serve(async (req) => {
 
     if (!contestType) throw new Error('No contest type for today')
 
+    const { data: vehicleInfo } = await supabase
+      .from('vehicles').select('cooldown_hours').eq('vehicle_number', vehicle_id).maybeSingle()
+
+    const cooldownHours = vehicleInfo?.cooldown_hours || 9
+    const cooldownMs = cooldownHours * 60 * 60 * 1000
+    const cutoffTime = new Date(Date.now() - cooldownMs).toISOString()
+
     const { data: existingWinner } = await supabase
-      .from('contest_winners').select('id').eq('vehicle_id', vehicle_id).maybeSingle()
+      .from('contest_winners').select('id')
+      .eq('vehicle_id', vehicle_id)
+      .gte('created_at', cutoffTime)
+      .maybeSingle()
 
     if (existingWinner) {
-      return new Response(JSON.stringify({ message: 'Winner already picked for this journey' }), {
+      return new Response(JSON.stringify({ message: `Winner already picked! Next trip available in roughly ${cooldownHours}h` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }

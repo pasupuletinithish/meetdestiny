@@ -52,9 +52,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     const checkExpiry = async () => {
-      // Skip check if user is on login, check-in, or related open routes
+      // Skip check if user is on login, check-in, admin, or related open routes
       const path = window.location.pathname;
-      if (path === '/' || path === '/check-in' || path === '/terms' || path === '/privacy') return;
+      if (path === '/' || path === '/check-in' || path === '/terms' || path === '/privacy' || path.startsWith('/admin')) return;
       
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
